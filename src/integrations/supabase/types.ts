@@ -14,16 +14,351 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bills: {
+        Row: {
+          balance_due: number
+          bill_number: string
+          created_at: string
+          customer_id: string
+          due_date: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          paid_amount: number
+          status: string
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          balance_due?: number
+          bill_number: string
+          created_at?: string
+          customer_id: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          paid_amount?: number
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          balance_due?: number
+          bill_number?: string
+          created_at?: string
+          customer_id?: string
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          paid_amount?: number
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_items: {
+        Row: {
+          created_at: string
+          id: string
+          order_id: string
+          price_per_meter: number
+          product_id: string
+          product_name: string
+          quantity_meters: number
+          total_price: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          order_id: string
+          price_per_meter: number
+          product_id: string
+          product_name: string
+          quantity_meters: number
+          total_price: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          order_id?: string
+          price_per_meter?: number
+          product_id?: string
+          product_name?: string
+          quantity_meters?: number
+          total_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          notes: string | null
+          order_number: string
+          status: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          notes?: string | null
+          order_number: string
+          status?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          notes?: string | null
+          order_number?: string
+          status?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          bill_id: string
+          created_at: string
+          customer_id: string
+          id: string
+          notes: string | null
+          payment_method: string
+          transaction_id: string | null
+        }
+        Insert: {
+          amount: number
+          bill_id: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          transaction_id?: string | null
+        }
+        Update: {
+          amount?: number
+          bill_id?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          notes?: string | null
+          payment_method?: string
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          min_order_quantity: number | null
+          name: string
+          price_per_meter: number
+          stock_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          min_order_quantity?: number | null
+          name: string
+          price_per_meter: number
+          stock_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          min_order_quantity?: number | null
+          name?: string
+          price_per_meter?: number
+          stock_status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          business_name: string | null
+          created_at: string
+          email: string | null
+          full_name: string
+          gst_number: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          business_name?: string | null
+          created_at?: string
+          email?: string | null
+          full_name: string
+          gst_number?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          business_name?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string
+          gst_number?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sample_requests: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          message: string | null
+          product_id: string | null
+          product_name: string
+          quantity: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          message?: string | null
+          product_id?: string | null
+          product_name: string
+          quantity?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          message?: string | null
+          product_id?: string | null
+          product_name?: string
+          quantity?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sample_requests_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_bill_number: { Args: never; Returns: string }
+      generate_order_number: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin_or_ca: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "customer" | "admin" | "ca"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +485,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["customer", "admin", "ca"],
+    },
   },
 } as const
