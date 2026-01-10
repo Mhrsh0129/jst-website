@@ -111,7 +111,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     // try local bridge first for "phone/phone" login
     try {
-      const resp = await fetch("http://localhost:8000/api/login", {
+      const BRIDGE_URL = import.meta.env.VITE_BRIDGE_API_URL || "http://localhost:8000";
+      const resp = await fetch(`${BRIDGE_URL}/api/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

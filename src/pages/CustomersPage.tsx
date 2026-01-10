@@ -70,7 +70,8 @@ const CustomersPage = () => {
       try {
         // Try local bridge first
         try {
-          const localResp = await fetch("http://localhost:8000/api/admin/customers", {
+          const BRIDGE_URL = import.meta.env.VITE_BRIDGE_API_URL || "http://localhost:8000";
+          const localResp = await fetch(`${BRIDGE_URL}/api/admin/customers`, {
             headers: { "x-api-key": "Maharsh_JST_0129" }
           });
           if (localResp.ok) {

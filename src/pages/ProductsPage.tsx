@@ -36,60 +36,69 @@ const ProductsPage = () => {
     }
   }, [user, loading, navigate]);
 
+  const mapCategory = (dbCategory: string) => {
+    const cat = dbCategory.toLowerCase();
+    if (cat.includes("grey") || cat.includes("white") || cat.includes("black")) return "Standard";
+    if (cat.includes("synthetic")) return "Economy";
+    if (cat.includes("cotton")) return "Premium";
+    return "Standard";
+  };
+
   useEffect(() => {
     const fetchProducts = async () => {
-      // Try local bridge first for "Jay Shree Traders Database" connection
+      setIsLoading(true); // Set loading true at the start of fetch
+      // Try local bridge first for products
       try {
-        const localResp = await fetch("http://localhost:8000/api/products", {
+        const BRIDGE_URL = import.meta.env.VITE_BRIDGE_API_URL || "http://localhost:8000";
+        const localResp = await fetch(`${BRIDGE_URL}/api/products`, {
           headers: { "x-api-key": "Maharsh_JST_0129" }
         });
         if (localResp.ok) {
           const localData = await localResp.json();
-          if (localData && localData.length > 0) {
-            // Map SQLite schema to Supabase schema for UI compatibility
-            const mapped = localData.map((p: any) => {
-              let cat = "standard";
-              if (p.category.toLowerCase().includes("premium")) cat = "premium";
-              if (p.category.toLowerCase().includes("grey")) cat = "standard";
-              if (p.category.toLowerCase().includes("synthetic")) cat = "economy";
-
-              return {
-                id: p.sku || p.id.toString(),
-                name: p.name,
-                price_per_meter: p.price,
-                category: cat,
-                description: `SKU: ${p.sku}`,
-                min_order_quantity: 10,
-                stock_status: "in_stock"
-              };
-            });
-            setProducts(mapped);
-            setIsLoadingProducts(false);
-            return;
-          }
+          // Map local data (snake_case) to frontend model (camelCase)
+          const mappedProducts = localData.map((p: any, index: number) => ({
+            id: p.sku || `local-${index}`,
+            name: p.name,
+            description: "High quality premium pocketing fabric",
+            price: p.price,
+            image: "https://images.unsplash.com/photo-1528459801416-a9e53bbf4e17?w=500&auto=format&fit=crop", // placeholder
+            category: mapCategory(p.category || ""),
+            stock: p.stock_quantity,
+            gstRate: 5 // Default for textile 2026
+          }));
+          setProducts(mappedProducts);
+          setIsLoading(false);
+          return;
         }
       } catch (e) {
         console.log("Local bridge offline, fetching from Supabase...");
       }
 
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true)
-        .order("price_per_meter", { ascending: true });
+      try { // Wrap Supabase fetch in try-catch as well
+        const { data, error } = await supabase
+          .from("products")
+          .select("*");
 
-      if (error) {
+        if (error) throw error;
+
+        if (data) {
+          const mappedProducts = data.map((p) => ({
+            ...p,
+            price: p.price_per_meter, // Map price_per_meter to price for consistency
+            gstRate: p.gst_rate || 18 // fallback
+          }));
+          setProducts(mappedProducts);
+        }
+      } catch (error) {
         console.error("Error fetching products:", error);
         toast({
           title: "Error",
           description: "Failed to load products. Please try again.",
           variant: "destructive",
         });
-      } else {
-        setProducts(data || []);
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoadingProducts(false);
     };
 
     if (user) {
@@ -109,86 +118,82 @@ const ProductsPage = () => {
     return null;
   }
 
-  const categories = ["all", "economy", "standard", "premium"];
-  const filteredProducts =
-    selectedCategory === "all"
-      ? products
-      : products.filter((p) => p.category === selectedCategory);
+  const categories = ["All", "Economy", "Standard", "Premium"]; // Changed to capitalized
+  const filteredProducts = products.filter(
+    (product) =>
+      (selectedCategory === "All" || product.category === selectedCategory) &&
+      product.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const getCategoryColor = (category: string) => {
     switch (category) {
-      case "economy":
+      case "Economy": // Changed to capitalized
         return "bg-muted text-muted-foreground";
-      case "standard":
+      case "Standard": // Changed to capitalized
         return "bg-secondary text-secondary-foreground";
-      case "premium":
+      case "Premium": // Changed to capitalized
         return "bg-accent/20 text-accent-foreground";
       default:
         return "bg-muted text-muted-foreground";
     }
   };
 
-  const handleRequestSample = async (product: Product) => {
-    try {
-      // Try local bridge first
-      const resp = await fetch("http://localhost:8000/api/sample-requests", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": "Maharsh_JST_0129"
-        },
-        body: JSON.stringify({
-          customer_id: user.id,
-          product_id: product.id,
-          product_name: product.name,
-        })
-      });
-
-      if (resp.ok) {
-        toast({
-          title: "Sample Requested!",
-          description: `Logged in local database for ${product.name}.`,
+  const handleRequestSample = async (product: Product) => { // Changed product type to Product
+    // Check if user is logged in via local bridge
+    if (user && !user.id.includes("-")) {
+      try {
+        const BRIDGE_URL = import.meta.env.VITE_BRIDGE_API_URL || "http://localhost:8000";
+        const resp = await fetch(`${BRIDGE_URL}/api/sample-requests`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": "Maharsh_JST_0129"
+          },
+          body: JSON.stringify({
+            product_name: product.name,
+            product_id: product.id
+          })
         });
-        return;
+        if (resp.ok) {
+          toast({
+            title: "Sample Request Sent",
+            description: "Your request has been logged in the local database."
+          });
+          return;
+        }
+      } catch (e) {
+        console.error("Local sample request failed", e);
       }
+    }
 
+    try {
       const { error } = await supabase.from("sample_requests").insert({
-        customer_id: user.id,
         product_id: product.id,
-        product_name: product.name,
+        user_id: user?.id,
         status: "pending",
       });
 
       if (error) throw error;
 
       toast({
-        title: "Sample Requested!",
-        description: `We'll contact you about the ${product.name} sample.`,
+        title: "Sample Requested",
+        description: `We'll send a sample of ${product.name} to your registered address.`,
       });
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to request sample. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
+        const resp = await fetch("http://localhost:8000/api/place-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": "Maharsh_JST_0129"
+          },
+          body: JSON.stringify({
+            customer_id: user.id,
+            product_id: product.id,
+          })
+        });
 
-  const handlePlaceOrder = async (product: Product) => {
-    try {
-      const resp = await fetch("http://localhost:8000/api/place-order", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": "Maharsh_JST_0129"
-        },
-        body: JSON.stringify({
-          customer_id: user.id,
-          product_id: product.id,
-        })
-      });
-
-      if (resp.ok) {
+        if(resp.ok) {
         toast({
           title: "Order Received!",
           description: `Order for ${product.name} has been placed.`,
