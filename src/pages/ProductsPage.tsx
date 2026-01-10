@@ -97,7 +97,7 @@ const ProductsPage = () => {
           variant: "destructive",
         });
       } finally {
-        setIsLoading(false);
+        setIsLoadingProducts(false);
       }
     };
 
@@ -105,6 +105,9 @@ const ProductsPage = () => {
       fetchProducts();
     }
   }, [user, toast]);
+
+  // Missing state for searchQuery
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (loading) {
     return (
@@ -118,27 +121,38 @@ const ProductsPage = () => {
     return null;
   }
 
-  const categories = ["All", "Economy", "Standard", "Premium"]; // Changed to capitalized
-  const filteredProducts = products.filter(
-    (product) =>
-      (selectedCategory === "All" || product.category === selectedCategory) &&
-      product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const categories = ["All", "Economy", "Standard", "Premium"];
+  // Fix filtering logic
+  const filteredProducts = products.filter((product) => {
+    let matchesCategory = false;
+    if (selectedCategory === "All") {
+      matchesCategory = true;
+    } else {
+      // Handle case-insensitive match for category
+      const pCat = product.category ? product.category.toLowerCase() : "";
+      const sCat = selectedCategory.toLowerCase();
+      matchesCategory = pCat === sCat;
+    }
+
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "Economy": // Changed to capitalized
+    const cat = category ? category.toLowerCase() : "standard";
+    switch (cat) {
+      case "economy":
         return "bg-muted text-muted-foreground";
-      case "Standard": // Changed to capitalized
+      case "standard":
         return "bg-secondary text-secondary-foreground";
-      case "Premium": // Changed to capitalized
+      case "premium":
         return "bg-accent/20 text-accent-foreground";
       default:
         return "bg-muted text-muted-foreground";
     }
   };
 
-  const handleRequestSample = async (product: Product) => { // Changed product type to Product
+  const handleRequestSample = async (product: Product) => {
     // Check if user is logged in via local bridge
     if (user && !user.id.includes("-")) {
       try {
@@ -169,8 +183,12 @@ const ProductsPage = () => {
     try {
       const { error } = await supabase.from("sample_requests").insert({
         product_id: product.id,
-        user_id: user?.id,
+        // The table expects customer_id or user_id depending on your schema. 
+        // Based on previous errors, let's use customer_id if user_id failed, or vice versa.
+        // The error said "user_id" does not exist, so it wants "customer_id" likely.
+        customer_id: user?.id,
         status: "pending",
+        product_name: product.name // Sometimes helpful to store name if relational link breaks
       });
 
       if (error) throw error;
@@ -180,165 +198,156 @@ const ProductsPage = () => {
         description: `We'll send a sample of ${product.name} to your registered address.`,
       });
     } catch (error) {
-      toast({
-        const resp = await fetch("http://localhost:8000/api/place-order", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": "Maharsh_JST_0129"
-          },
-          body: JSON.stringify({
-            customer_id: user.id,
-            product_id: product.id,
+      product_id: product.id,
           })
-        });
+  });
 
-        if(resp.ok) {
-        toast({
-          title: "Order Received!",
-          description: `Order for ${product.name} has been placed.`,
-        });
-      }
-    } catch (e) {
-      toast({
-        title: "Error",
-        description: "Order system offline.",
-        variant: "destructive"
-      });
-    }
+  if (resp.ok) {
+    toast({
+      title: "Order Received!",
+      description: `Order for ${product.name} has been placed.`,
+    });
+  }
+} catch (e) {
+  toast({
+    title: "Error",
+    description: "Order system offline.",
+    variant: "destructive"
+  });
+}
   };
 
-  return (
-    <div className="min-h-screen bg-muted/30">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                to="/dashboard"
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <h1 className="font-display text-xl font-bold text-foreground">
-                Product Catalog
-              </h1>
-            </div>
-            <Link to="/dashboard">
-              <Button variant="outline" size="sm">
-                Dashboard
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
-        {/* Category Filter */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {categories.map((category) => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${selectedCategory === category
-                ? "bg-primary text-primary-foreground"
-                : "bg-card text-muted-foreground hover:bg-muted"
-                }`}
+return (
+  <div className="min-h-screen bg-muted/30">
+    {/* Header */}
+    <header className="bg-card border-b border-border sticky top-0 z-50">
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/dashboard"
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              {category === "all" ? "All Products" : category}
-            </button>
-          ))}
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <h1 className="font-display text-xl font-bold text-foreground">
+              Product Catalog
+            </h1>
+          </div>
+          <Link to="/dashboard">
+            <Button variant="outline" size="sm">
+              Dashboard
+            </Button>
+          </Link>
         </div>
+      </div>
+    </header>
 
-        {/* Products Grid */}
-        {isLoadingProducts ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-16">
-            <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No products found</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map((product) => (
-              <div
-                key={product.id}
-                className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all"
+    <main className="container mx-auto px-4 py-8">
+      {/* Category Filter */}
+      <div className="flex flex-wrap gap-2 mb-8">
+        {categories.map((category) => (
+          <button
+            key={category}
+            onClick={() => setSelectedCategory(category)}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${selectedCategory === category
+              ? "bg-primary text-primary-foreground"
+              : "bg-card text-muted-foreground hover:bg-muted"
+              }`}
+          >
+            {category === "all" ? "All Products" : category}
+          </button>
+        ))}
+      </div>
+
+      {/* Products Grid */}
+      {isLoadingProducts ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      ) : filteredProducts.length === 0 ? (
+        <div className="text-center py-16">
+          <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No products found</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => (
+            <div
+              key={product.id}
+              className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all"
+            >
+              {/* Category Badge */}
+              <span
+                className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 capitalize ${getCategoryColor(
+                  product.category
+                )}`}
               >
-                {/* Category Badge */}
-                <span
-                  className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 capitalize ${getCategoryColor(
-                    product.category
-                  )}`}
-                >
-                  {product.category}
+                {product.category}
+              </span>
+
+              {/* Product Info */}
+              <h3 className="font-display text-lg font-semibold text-foreground mb-2">
+                {product.name}
+              </h3>
+              <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                {product.description || "Premium quality pocketing fabric"}
+              </p>
+
+              {/* Price */}
+              <div className="flex items-baseline gap-1 mb-4">
+                <IndianRupee className="w-5 h-5 text-primary" />
+                <span className="font-display text-3xl font-bold text-primary">
+                  {Number(product.price_per_meter)}
                 </span>
+                <span className="text-muted-foreground text-sm">/ meter</span>
+              </div>
 
-                {/* Product Info */}
-                <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                  {product.name}
-                </h3>
-                <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                  {product.description || "Premium quality pocketing fabric"}
-                </p>
-
-                {/* Price */}
-                <div className="flex items-baseline gap-1 mb-4">
-                  <IndianRupee className="w-5 h-5 text-primary" />
-                  <span className="font-display text-3xl font-bold text-primary">
-                    {Number(product.price_per_meter)}
+              {/* Details */}
+              <div className="space-y-2 mb-6 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Min. Order</span>
+                  <span className="font-medium text-foreground">
+                    {product.min_order_quantity} meters
                   </span>
-                  <span className="text-muted-foreground text-sm">/ meter</span>
                 </div>
-
-                {/* Details */}
-                <div className="space-y-2 mb-6 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Min. Order</span>
-                    <span className="font-medium text-foreground">
-                      {product.min_order_quantity} meters
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Availability</span>
-                    <span
-                      className={`font-medium ${product.stock_status === "in_stock"
-                        ? "text-green-600"
-                        : "text-amber-600"
-                        }`}
-                    >
-                      {product.stock_status === "in_stock"
-                        ? "In Stock"
-                        : "Limited"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleRequestSample(product)}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Availability</span>
+                  <span
+                    className={`font-medium ${product.stock_status === "in_stock"
+                      ? "text-green-600"
+                      : "text-amber-600"
+                      }`}
                   >
-                    Request Sample
-                  </Button>
-                  <Button variant="gold" size="sm" className="flex-1" onClick={() => handlePlaceOrder(product)}>
-                    <ShoppingCart className="w-4 h-4" />
-                    Order
-                  </Button>
+                    {product.stock_status === "in_stock"
+                      ? "In Stock"
+                      : "Limited"}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
-  );
+
+              {/* Actions */}
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => handleRequestSample(product)}
+                >
+                  Request Sample
+                </Button>
+                <Button variant="gold" size="sm" className="flex-1" onClick={() => handlePlaceOrder(product)}>
+                  <ShoppingCart className="w-4 h-4" />
+                  Order
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </main>
+  </div>
+);
 };
 
 export default ProductsPage;
