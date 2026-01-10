@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             business_name: localData.user.business_name,
             isLocal: true // Mark clearly as local
           }
-        } as any;
+        } as unknown as User;
         setUser(pseudoUser);
         setUserRole(localData.role); // Uses Admin/CA/Customer from API
         setLoading(false);

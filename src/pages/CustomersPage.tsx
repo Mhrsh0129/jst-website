@@ -76,7 +76,15 @@ const CustomersPage = () => {
           });
           if (localResp.ok) {
             const localData = await localResp.json();
-            const mapped = localData.map((c: any) => ({
+            const mapped = localData.map((c: {
+              s_no: number;
+              phone: string;
+              customer_name: string;
+              business_name: string;
+              credit_limit_remaining: number;
+              credit_limit_used: number;
+              total_remaining_amount: number;
+            }) => ({
               id: c.s_no.toString(),
               user_id: c.phone,
               full_name: c.customer_name,
