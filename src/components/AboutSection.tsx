@@ -5,7 +5,7 @@ const AboutSection = () => {
   const stats = [
     { number: "30+", label: "Years Experience", icon: TrendingUp },
     { number: "500+", label: "Happy Clients", icon: Users },
-    { number: "1000+", label: "Products", icon: Package },
+    { number: "2", label: "Product Lines", icon: Package },
   ];
 
   const features = [
@@ -64,10 +64,9 @@ const AboutSection = () => {
             </div>
 
             <p className="text-muted-foreground leading-relaxed">
-              Located in the heart of Rajwada, our showroom showcases an extensive 
-              range of pocketing materials suitable for all garment types. From budget-friendly 
-              options starting at ₹20 to premium varieties up to ₹100 per meter, we cater 
-              to businesses of all sizes.
+              Located in the heart of Rajwada, we specialize in <strong className="text-foreground">pocketing fabrics</strong> and <strong className="text-foreground">zips</strong> for 
+              pants and trousers. From budget-friendly options starting at ₹20 to premium 
+              varieties up to ₹100 per meter, we cater to businesses of all sizes.
             </p>
 
             {/* Features Grid */}
