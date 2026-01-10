@@ -154,6 +154,54 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_reminders: {
+        Row: {
+          bill_id: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          message: string
+          reminder_type: string
+          sent_at: string
+          sent_by: string
+        }
+        Insert: {
+          bill_id?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          message: string
+          reminder_type: string
+          sent_at?: string
+          sent_by: string
+        }
+        Update: {
+          bill_id?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          message?: string
+          reminder_type?: string
+          sent_at?: string
+          sent_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reminders_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reminders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -242,6 +290,7 @@ export type Database = {
           address: string | null
           business_name: string | null
           created_at: string
+          credit_limit: number | null
           email: string | null
           full_name: string
           gst_number: string | null
@@ -254,6 +303,7 @@ export type Database = {
           address?: string | null
           business_name?: string | null
           created_at?: string
+          credit_limit?: number | null
           email?: string | null
           full_name: string
           gst_number?: string | null
@@ -266,6 +316,7 @@ export type Database = {
           address?: string | null
           business_name?: string | null
           created_at?: string
+          credit_limit?: number | null
           email?: string | null
           full_name?: string
           gst_number?: string | null

@@ -249,15 +249,6 @@ const Dashboard = () => {
           </Link>
 
           <Link
-            to="/orders"
-            className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
-          >
-            <ShoppingCart className="w-8 h-8 text-accent mx-auto mb-3 group-hover:scale-110 transition-transform" />
-            <p className="font-medium text-foreground">Orders</p>
-            <p className="text-xs text-muted-foreground">View history</p>
-          </Link>
-
-          <Link
             to="/bills"
             className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
           >
@@ -267,14 +258,56 @@ const Dashboard = () => {
           </Link>
 
           <Link
-            to="/payments"
+            to="/payment-history"
             className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
           >
             <CreditCard className="w-8 h-8 text-green-500 mx-auto mb-3 group-hover:scale-110 transition-transform" />
             <p className="font-medium text-foreground">Payments</p>
-            <p className="text-xs text-muted-foreground">Pay bills</p>
+            <p className="text-xs text-muted-foreground">Payment history</p>
           </Link>
+
+          {(userRole === "admin" || userRole === "ca") && (
+            <Link
+              to="/customers"
+              className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
+            >
+              <User className="w-8 h-8 text-accent mx-auto mb-3 group-hover:scale-110 transition-transform" />
+              <p className="font-medium text-foreground">Customers</p>
+              <p className="text-xs text-muted-foreground">Manage clients</p>
+            </Link>
+          )}
         </div>
+
+        {/* Admin Quick Actions */}
+        {(userRole === "admin" || userRole === "ca") && (
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-8">
+            <Link
+              to="/analytics"
+              className="bg-gradient-hero text-primary-foreground rounded-xl p-6 shadow-soft hover:shadow-medium transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <Settings className="w-10 h-10 group-hover:scale-110 transition-transform" />
+                <div>
+                  <p className="font-semibold text-lg">Sales Analytics</p>
+                  <p className="text-sm text-primary-foreground/80">View trends & reports</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              to="/customers"
+              className="bg-card border-2 border-accent rounded-xl p-6 shadow-soft hover:shadow-medium transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <User className="w-10 h-10 text-accent group-hover:scale-110 transition-transform" />
+                <div>
+                  <p className="font-semibold text-lg text-foreground">Customer Management</p>
+                  <p className="text-sm text-muted-foreground">Credit limits & reminders</p>
+                </div>
+              </div>
+            </Link>
+          </div>
+        )}
 
         {/* Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
