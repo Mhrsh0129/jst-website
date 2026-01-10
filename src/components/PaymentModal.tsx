@@ -119,16 +119,52 @@ const PaymentModal = ({ isOpen, onClose, bill }: PaymentModalProps) => {
             </div>
             <div className="bg-muted/50 rounded-xl p-4 space-y-2 text-sm">
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Bank:</span>
+                <span className="font-medium text-foreground">HDFC Bank</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Account Name:</span>
                 <span className="font-medium text-foreground">Jay Shree Traders</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Account No:</span>
-                <span className="font-medium text-foreground">Contact for details</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-foreground">50200101611788</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => copyToClipboard("50200101611788", "Account Number")}
+                  >
+                    {copied === "Account Number" ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">IFSC:</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-foreground">HDFC0005222</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => copyToClipboard("HDFC0005222", "IFSC Code")}
+                  >
+                    {copied === "IFSC Code" ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </Button>
+                </div>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">IFSC:</span>
-                <span className="font-medium text-foreground">Contact for details</span>
+                <span className="text-muted-foreground">Branch:</span>
+                <span className="font-medium text-foreground">Rambagh, Indore-452002</span>
               </div>
             </div>
           </div>
