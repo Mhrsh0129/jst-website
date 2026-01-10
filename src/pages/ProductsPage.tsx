@@ -85,7 +85,7 @@ const ProductsPage = () => {
           const mappedProducts = data.map((p) => ({
             ...p,
             price: p.price_per_meter, // Map price_per_meter to price for consistency
-            gstRate: p.gst_rate || 18 // fallback
+            gstRate: (p as any).gst_rate || 18 // fallback
           }));
           setProducts(mappedProducts);
         }
@@ -202,7 +202,7 @@ const ProductsPage = () => {
         description: "Your sample request has been received.",
       });
     }
-  };
+    }
 };
 
 const handlePlaceOrder = async (product: Product) => {
