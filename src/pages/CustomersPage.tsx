@@ -64,6 +64,7 @@ interface CustomerFormData {
   address: string;
   gst_number: string;
   credit_limit: string;
+  password: string;
 }
 
 const initialFormData: CustomerFormData = {
@@ -74,6 +75,7 @@ const initialFormData: CustomerFormData = {
   address: "",
   gst_number: "",
   credit_limit: "50000",
+  password: "",
 };
 
 const CustomersPage = () => {
@@ -241,7 +243,7 @@ const CustomersPage = () => {
     setEditingCreditLimit(true);
   };
 
-  // Handle adding a new customer (admin only - creates profile without auth user)
+  // Handle adding a new customer via edge function (creates real auth user)
   const handleAddCustomer = async () => {
     if (!formData.full_name.trim()) {
       toast({
@@ -252,41 +254,63 @@ const CustomersPage = () => {
       return;
     }
 
+    if (!formData.email.trim() || !formData.email.includes("@")) {
+      toast({
+        title: "Validation Error",
+        description: "Valid email is required for customer login.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      // Create a profile directly (for walk-in customers without login)
-      const { data, error } = await supabase
-        .from("profiles")
-        .insert({
-          user_id: crypto.randomUUID(), // Generate a placeholder UUID for non-auth customers
+      // Call edge function to create customer with proper auth user
+      const { data, error } = await supabase.functions.invoke("create-customer", {
+        body: {
           full_name: formData.full_name.trim(),
           business_name: formData.business_name.trim() || null,
           phone: formData.phone.trim() || null,
-          email: formData.email.trim() || null,
+          email: formData.email.trim(),
           address: formData.address.trim() || null,
           gst_number: formData.gst_number.trim() || null,
           credit_limit: parseFloat(formData.credit_limit) || 50000,
-        })
-        .select()
-        .single();
+          password: formData.password.trim() || null,
+        },
+      });
 
       if (error) throw error;
 
-      // Add to local state
-      setCustomers(prev => [
-        ...prev,
-        {
-          ...data,
-          credit_limit: data.credit_limit || 50000,
-          totalOutstanding: 0,
-          totalPaid: 0,
-        },
-      ]);
+      if (data.error) {
+        throw new Error(data.error);
+      }
 
-      toast({
-        title: "Customer Added",
-        description: `${formData.full_name} has been added successfully.`,
-      });
+      // Add to local state
+      if (data.profile) {
+        setCustomers(prev => [
+          ...prev,
+          {
+            ...data.profile,
+            credit_limit: data.profile.credit_limit || 50000,
+            totalOutstanding: 0,
+            totalPaid: 0,
+          },
+        ]);
+      }
+
+      // Show credentials if password was auto-generated
+      if (data.generatedPassword) {
+        toast({
+          title: "Customer Added",
+          description: `${formData.full_name} created. Password: ${data.generatedPassword} - Share this with the customer!`,
+          duration: 15000,
+        });
+      } else {
+        toast({
+          title: "Customer Added",
+          description: `${formData.full_name} has been added successfully.`,
+        });
+      }
 
       setIsAddingCustomer(false);
       setFormData(initialFormData);
@@ -411,6 +435,7 @@ const CustomersPage = () => {
       address: customer.address || "",
       gst_number: customer.gst_number || "",
       credit_limit: customer.credit_limit.toString(),
+      password: "",
     });
     setIsEditingCustomer(true);
   };
@@ -748,6 +773,7 @@ const CustomersPage = () => {
                 value={formData.full_name}
                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                 placeholder="Enter customer name"
+                maxLength={100}
               />
             </div>
             <div className="space-y-2">
@@ -757,6 +783,7 @@ const CustomersPage = () => {
                 value={formData.business_name}
                 onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
                 placeholder="Enter business name"
+                maxLength={200}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -767,19 +794,41 @@ const CustomersPage = () => {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="Enter phone number"
+                  maxLength={15}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email {isAddingCustomer && "*"}</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="Enter email"
+                  maxLength={255}
+                  required={isAddingCustomer}
                 />
+                {isAddingCustomer && (
+                  <p className="text-xs text-muted-foreground">Required for customer login</p>
+                )}
               </div>
             </div>
+            {isAddingCustomer && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Password (optional)</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Leave empty to auto-generate"
+                  minLength={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to auto-generate a secure password
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="address">Address</Label>
               <Input
@@ -787,6 +836,7 @@ const CustomersPage = () => {
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 placeholder="Enter address"
+                maxLength={500}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -797,6 +847,7 @@ const CustomersPage = () => {
                   value={formData.gst_number}
                   onChange={(e) => setFormData({ ...formData, gst_number: e.target.value })}
                   placeholder="Enter GST number"
+                  maxLength={15}
                 />
               </div>
               <div className="space-y-2">
