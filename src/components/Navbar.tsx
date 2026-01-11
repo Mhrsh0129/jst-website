@@ -37,7 +37,7 @@ const Navbar = () => {
           <Link to="/" className="flex items-center gap-2">
             <span
               className={`font-display text-xl md:text-2xl font-bold transition-colors ${
-                isScrolled ? "text-primary" : "text-primary-foreground"
+                isScrolled ? "text-maroon dark:text-gold" : "text-cream"
               }`}
             >
               Jay Shree Traders
@@ -50,10 +50,10 @@ const Navbar = () => {
               <a
                 key={link.name}
                 href={link.href}
-                className={`text-sm font-medium transition-colors hover:text-accent ${
+                className={`text-sm font-medium transition-colors hover:text-gold ${
                   isScrolled
                     ? "text-foreground/80"
-                    : "text-primary-foreground/90"
+                    : "text-cream/90"
                 }`}
               >
                 {link.name}
@@ -64,6 +64,7 @@ const Navbar = () => {
               <Button
                 variant={isScrolled ? "default" : "heroOutline"}
                 size="sm"
+                className={!isScrolled ? "border-cream/80 text-cream hover:bg-cream/10" : ""}
               >
                 Login
               </Button>
@@ -78,13 +79,13 @@ const Navbar = () => {
             {isMobileMenuOpen ? (
               <X
                 className={`w-6 h-6 ${
-                  isScrolled ? "text-foreground" : "text-primary-foreground"
+                  isScrolled ? "text-foreground" : "text-cream"
                 }`}
               />
             ) : (
               <Menu
                 className={`w-6 h-6 ${
-                  isScrolled ? "text-foreground" : "text-primary-foreground"
+                  isScrolled ? "text-foreground" : "text-cream"
                 }`}
               />
             )}

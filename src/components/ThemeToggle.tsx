@@ -45,7 +45,7 @@ const ThemeToggle = ({ variant = "default" }: ThemeToggleProps) => {
       variant={variant === "transparent" ? "ghost" : "outline"}
       size="icon"
       onClick={toggleTheme}
-      className={variant === "transparent" ? "text-primary-foreground hover:bg-primary-foreground/10 border border-primary-foreground/30" : ""}
+      className={variant === "transparent" ? "text-cream hover:bg-cream/10 border border-cream/30" : ""}
     >
       {isDark ? (
         <Sun className="h-5 w-5" />
