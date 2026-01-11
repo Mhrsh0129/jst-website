@@ -7,11 +7,13 @@ import {
   ArrowLeft,
   FileText,
   Loader2,
-  IndianRupee,
   Download,
   QrCode,
 } from "lucide-react";
 import PaymentModal from "@/components/PaymentModal";
+import AIChatWidget from "@/components/AIChatWidget";
+import { generateInvoicePDF } from "@/utils/generateInvoicePDF";
+import { useToast } from "@/hooks/use-toast";
 
 interface Bill {
   id: string;
@@ -31,10 +33,103 @@ interface Bill {
 const BillsPage = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [bills, setBills] = useState<Bill[]>([]);
   const [isLoadingBills, setIsLoadingBills] = useState(true);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [downloadingBillId, setDownloadingBillId] = useState<string | null>(null);
+
+  const handleDownloadInvoice = async (bill: Bill) => {
+    setDownloadingBillId(bill.id);
+    try {
+      // Fetch customer profile
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user?.id)
+        .single();
+
+      if (profileError) throw profileError;
+
+      // Fetch order details if exists
+      let order = null;
+      let orderItems: any[] = [];
+
+      if (bill.order_id) {
+        const { data: orderData } = await supabase
+          .from("orders")
+          .select("*")
+          .eq("id", bill.order_id)
+          .single();
+        order = orderData;
+
+        if (order) {
+          const { data: items } = await supabase
+            .from("order_items")
+            .select("*")
+            .eq("order_id", order.id);
+          orderItems = items || [];
+        }
+      }
+
+      // If no order items, create a generic line item
+      if (orderItems.length === 0) {
+        orderItems = [
+          {
+            product_name: "Fabric Order",
+            quantity_meters: 1,
+            price_per_meter: bill.subtotal,
+            total_price: bill.subtotal,
+          },
+        ];
+      }
+
+      generateInvoicePDF(
+        {
+          bill_number: bill.bill_number,
+          created_at: bill.created_at,
+          due_date: bill.due_date,
+          subtotal: Number(bill.subtotal),
+          tax_amount: Number(bill.tax_amount),
+          total_amount: Number(bill.total_amount),
+          paid_amount: Number(bill.paid_amount),
+          balance_due: Number(bill.balance_due),
+          status: bill.status,
+          notes: bill.notes,
+        },
+        {
+          full_name: profile.full_name,
+          business_name: profile.business_name,
+          email: profile.email,
+          phone: profile.phone,
+          address: profile.address,
+          gst_number: profile.gst_number,
+        },
+        order
+          ? {
+              order_number: order.order_number,
+              created_at: order.created_at,
+            }
+          : null,
+        orderItems
+      );
+
+      toast({
+        title: "Invoice Downloaded",
+        description: `Invoice ${bill.bill_number} has been downloaded.`,
+      });
+    } catch (error) {
+      console.error("Error generating invoice:", error);
+      toast({
+        title: "Download Failed",
+        description: "Could not generate the invoice. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloadingBillId(null);
+    }
+  };
 
   useEffect(() => {
     if (!loading && !user) {
@@ -187,6 +282,19 @@ const BillsPage = () => {
                         ₹{Number(bill.balance_due).toLocaleString()}
                       </p>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadInvoice(bill)}
+                      disabled={downloadingBillId === bill.id}
+                    >
+                      {downloadingBillId === bill.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      Download
+                    </Button>
                     {Number(bill.balance_due) > 0 && (
                       <Button
                         variant="gold"
@@ -219,6 +327,9 @@ const BillsPage = () => {
           bill={selectedBill}
         />
       )}
+
+      {/* AI Order Support Chat */}
+      <AIChatWidget type="order" title="Order Support" />
     </div>
   );
 };
