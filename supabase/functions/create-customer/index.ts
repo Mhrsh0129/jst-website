@@ -77,8 +77,29 @@ serve(async (req: Request) => {
 
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    let loginEmail = email || `${phone}@jst.local`;
-    let loginPassword = phone || `JST${Math.random().toString(36).slice(-8)}`;
+    // Auto-generate email and password from phone number
+    // If phone exists: email = phone@jst.com, password = phone
+    // If no phone: use provided email and generate password
+    let loginEmail: string;
+    let loginPassword: string;
+    let generatedPassword = false;
+
+    if (phone && phone.length >= 10) {
+      // Use phone-based credentials
+      loginEmail = `${phone}@jst.com`;
+      loginPassword = phone;
+      generatedPassword = true;
+    } else if (email) {
+      // Use email with random password
+      loginEmail = email;
+      loginPassword = `JST${Math.random().toString(36).slice(-8)}`;
+      generatedPassword = true;
+    } else {
+      return new Response(JSON.stringify({ error: "Either phone or email is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email: loginEmail,

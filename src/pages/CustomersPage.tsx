@@ -341,19 +341,12 @@ const CustomersPage = () => {
         ]);
       }
 
-      // Show credentials if password was auto-generated
-      if (data.generatedPassword) {
-        toast({
-          title: "Customer Added",
-          description: `${formData.full_name} created. Password: ${data.generatedPassword} - Share this with the customer!`,
-          duration: 15000,
-        });
-      } else {
-        toast({
-          title: "Customer Added",
-          description: `${formData.full_name} has been added successfully.`,
-        });
-      }
+      // Show credentials - always show email and password
+      toast({
+        title: "Customer Added Successfully!",
+        description: `${formData.full_name} | Email: ${data.email} | Password: ${data.password}`,
+        duration: 12000,
+      });
 
       setIsAddingCustomer(false);
       setFormData(initialFormData);

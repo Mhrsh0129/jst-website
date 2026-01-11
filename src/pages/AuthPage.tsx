@@ -19,9 +19,7 @@ const loginSchema = z.object({
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   businessName: z.string().min(2, "Business name is required"),
-  phone: z.string().min(10, "Please enter a valid phone number"),
-  email: z.string().email("Please enter a valid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  phone: z.string().min(10, "Please enter a valid phone number").max(10, "Phone must be 10 digits"),
 });
 
 const phoneSchema = z.object({
@@ -120,8 +118,6 @@ const AuthPage = () => {
         name: formData.name,
         businessName: formData.businessName,
         phone: formData.phone,
-        email: formData.email,
-        password: formData.password,
       });
 
       if (!result.success) {
@@ -136,7 +132,11 @@ const AuthPage = () => {
         return;
       }
 
-      const { error } = await signUp(formData.email, formData.password, {
+      // Auto-generate email and password from phone number
+      const generatedEmail = `${formData.phone}@jst.com`;
+      const generatedPassword = formData.phone;
+
+      const { error } = await signUp(generatedEmail, generatedPassword, {
         full_name: formData.name,
         business_name: formData.businessName,
         phone: formData.phone,
@@ -162,7 +162,8 @@ const AuthPage = () => {
 
       toast({
         title: "Account Created!",
-        description: "Welcome to Jay Shree Traders. You can now access wholesale prices.",
+        description: `Your login credentials - Email: ${generatedEmail}, Password: ${formData.phone}`,
+        duration: 8000,
       });
       navigate("/dashboard");
     } catch (err) {
@@ -622,70 +623,25 @@ const AuthPage = () => {
                 <input
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormData({ ...formData, phone: value });
+                  }}
                   className={`w-full px-4 py-3 rounded-xl border ${
                     errors.phone ? "border-destructive" : "border-input"
                   } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
-                  placeholder="Enter your phone number"
+                  placeholder="Enter 10-digit phone number"
+                  maxLength={10}
                 />
                 {errors.phone && (
                   <p className="text-destructive text-xs mt-1">{errors.phone}</p>
                 )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.email ? "border-destructive" : "border-input"
-                  } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
-                  placeholder="Enter your email"
-                />
-                {errors.email && (
-                  <p className="text-destructive text-xs mt-1">{errors.email}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    className={`w-full px-4 py-3 rounded-xl border ${
-                      errors.password ? "border-destructive" : "border-input"
-                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all pr-12`}
-                    placeholder="Enter your password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-5 h-5" />
-                    ) : (
-                      <Eye className="w-5 h-5" />
-                    )}
-                  </button>
-                </div>
-                {errors.password && (
-                  <p className="text-destructive text-xs mt-1">{errors.password}</p>
-                )}
+                <p className="text-muted-foreground text-xs mt-2">
+                  Your login email will be: {formData.phone || 'XXXXXXXXXX'}@jst.com
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Your password will be your phone number
+                </p>
               </div>
 
               <Button
