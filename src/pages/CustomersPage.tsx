@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,9 +37,11 @@ import {
   Trash2,
   Save,
   FileText,
+  Receipt,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AddBillDialog from "@/components/AddBillDialog";
+import CustomerBillsDialog from "@/components/CustomerBillsDialog";
 
 interface Profile {
   id: string;
@@ -103,6 +105,10 @@ const CustomersPage = () => {
   // State for add bill dialog
   const [isAddingBill, setIsAddingBill] = useState(false);
   const [billCustomer, setBillCustomer] = useState<CustomerWithBalance | null>(null);
+  
+  // State for viewing customer bills
+  const [isViewingBills, setIsViewingBills] = useState(false);
+  const [viewingBillsCustomer, setViewingBillsCustomer] = useState<CustomerWithBalance | null>(null);
   
   // State for customer name autocomplete
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
@@ -480,6 +486,12 @@ const CustomersPage = () => {
     setIsAddingBill(true);
   };
 
+  // Open view bills dialog
+  const openViewBillsDialog = (customer: CustomerWithBalance) => {
+    setViewingBillsCustomer(customer);
+    setIsViewingBills(true);
+  };
+
   // Handle name input change for autocomplete
   const handleNameInputChange = (value: string) => {
     setFormData({ ...formData, full_name: value });
@@ -754,6 +766,14 @@ const CustomersPage = () => {
                         <div className="flex flex-wrap gap-2">
                           {userRole === "admin" && (
                             <>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => openViewBillsDialog(customer)}
+                              >
+                                <Receipt className="w-4 h-4 mr-1" />
+                                View Bills
+                              </Button>
                               <Button
                                 variant="default"
                                 size="sm"
@@ -1127,6 +1147,19 @@ const CustomersPage = () => {
           customerUserId={billCustomer.user_id}
           customerName={billCustomer.full_name}
           onBillAdded={refreshCustomers}
+        />
+      )}
+
+      {/* View Customer Bills Dialog */}
+      {viewingBillsCustomer && (
+        <CustomerBillsDialog
+          isOpen={isViewingBills}
+          onClose={() => {
+            setIsViewingBills(false);
+            setViewingBillsCustomer(null);
+          }}
+          customerUserId={viewingBillsCustomer.user_id}
+          customerName={viewingBillsCustomer.full_name}
         />
       )}
     </div>
