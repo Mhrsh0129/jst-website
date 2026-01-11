@@ -4,13 +4,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   ArrowLeft,
   Loader2,
@@ -21,6 +33,9 @@ import {
   MessageSquare,
   Bell,
   AlertTriangle,
+  UserPlus,
+  Trash2,
+  Save,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -31,6 +46,8 @@ interface Profile {
   business_name: string | null;
   phone: string | null;
   email: string | null;
+  address: string | null;
+  gst_number: string | null;
   credit_limit: number;
 }
 
@@ -38,6 +55,26 @@ interface CustomerWithBalance extends Profile {
   totalOutstanding: number;
   totalPaid: number;
 }
+
+interface CustomerFormData {
+  full_name: string;
+  business_name: string;
+  phone: string;
+  email: string;
+  address: string;
+  gst_number: string;
+  credit_limit: string;
+}
+
+const initialFormData: CustomerFormData = {
+  full_name: "",
+  business_name: "",
+  phone: "",
+  email: "",
+  address: "",
+  gst_number: "",
+  credit_limit: "50000",
+};
 
 const CustomersPage = () => {
   const { user, userRole, loading } = useAuth();
@@ -51,6 +88,13 @@ const CustomersPage = () => {
   const [newCreditLimit, setNewCreditLimit] = useState("");
   const [sendingReminder, setSendingReminder] = useState(false);
   const [reminderMessage, setReminderMessage] = useState("");
+  
+  // New state for admin features
+  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
+  const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -197,6 +241,186 @@ const CustomersPage = () => {
     setEditingCreditLimit(true);
   };
 
+  // Handle adding a new customer (admin only - creates profile without auth user)
+  const handleAddCustomer = async () => {
+    if (!formData.full_name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Customer name is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Create a profile directly (for walk-in customers without login)
+      const { data, error } = await supabase
+        .from("profiles")
+        .insert({
+          user_id: crypto.randomUUID(), // Generate a placeholder UUID for non-auth customers
+          full_name: formData.full_name.trim(),
+          business_name: formData.business_name.trim() || null,
+          phone: formData.phone.trim() || null,
+          email: formData.email.trim() || null,
+          address: formData.address.trim() || null,
+          gst_number: formData.gst_number.trim() || null,
+          credit_limit: parseFloat(formData.credit_limit) || 50000,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add to local state
+      setCustomers(prev => [
+        ...prev,
+        {
+          ...data,
+          credit_limit: data.credit_limit || 50000,
+          totalOutstanding: 0,
+          totalPaid: 0,
+        },
+      ]);
+
+      toast({
+        title: "Customer Added",
+        description: `${formData.full_name} has been added successfully.`,
+      });
+
+      setIsAddingCustomer(false);
+      setFormData(initialFormData);
+    } catch (error: any) {
+      console.error("Error adding customer:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add customer.",
+        variant: "destructive",
+      });
+    }
+    setIsSaving(false);
+  };
+
+  // Handle editing customer details
+  const handleEditCustomer = async () => {
+    if (!selectedCustomer || !formData.full_name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Customer name is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: formData.full_name.trim(),
+          business_name: formData.business_name.trim() || null,
+          phone: formData.phone.trim() || null,
+          email: formData.email.trim() || null,
+          address: formData.address.trim() || null,
+          gst_number: formData.gst_number.trim() || null,
+          credit_limit: parseFloat(formData.credit_limit) || 50000,
+        })
+        .eq("id", selectedCustomer.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setCustomers(prev =>
+        prev.map(c =>
+          c.id === selectedCustomer.id
+            ? {
+                ...c,
+                full_name: formData.full_name.trim(),
+                business_name: formData.business_name.trim() || null,
+                phone: formData.phone.trim() || null,
+                email: formData.email.trim() || null,
+                address: formData.address.trim() || null,
+                gst_number: formData.gst_number.trim() || null,
+                credit_limit: parseFloat(formData.credit_limit) || 50000,
+              }
+            : c
+        )
+      );
+
+      toast({
+        title: "Customer Updated",
+        description: `${formData.full_name} has been updated successfully.`,
+      });
+
+      setIsEditingCustomer(false);
+      setSelectedCustomer(null);
+      setFormData(initialFormData);
+    } catch (error: any) {
+      console.error("Error updating customer:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update customer.",
+        variant: "destructive",
+      });
+    }
+    setIsSaving(false);
+  };
+
+  // Handle deleting a customer
+  const handleDeleteCustomer = async () => {
+    if (!selectedCustomer) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", selectedCustomer.id);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setCustomers(prev => prev.filter(c => c.id !== selectedCustomer.id));
+
+      toast({
+        title: "Customer Deleted",
+        description: `${selectedCustomer.full_name} has been removed.`,
+      });
+
+      setIsDeletingCustomer(false);
+      setSelectedCustomer(null);
+    } catch (error: any) {
+      console.error("Error deleting customer:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete customer.",
+        variant: "destructive",
+      });
+    }
+    setIsSaving(false);
+  };
+
+  // Open edit dialog with customer data
+  const openEditDialog = (customer: CustomerWithBalance) => {
+    setSelectedCustomer(customer);
+    setFormData({
+      full_name: customer.full_name,
+      business_name: customer.business_name || "",
+      phone: customer.phone || "",
+      email: customer.email || "",
+      address: customer.address || "",
+      gst_number: customer.gst_number || "",
+      credit_limit: customer.credit_limit.toString(),
+    });
+    setIsEditingCustomer(true);
+  };
+
+  // Open delete confirmation
+  const openDeleteDialog = (customer: CustomerWithBalance) => {
+    setSelectedCustomer(customer);
+    setIsDeletingCustomer(true);
+  };
+
   const filteredCustomers = customers.filter(
     c =>
       c.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -221,20 +445,31 @@ const CustomersPage = () => {
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link to="/dashboard">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="font-display text-xl font-bold text-foreground">
-                Customer Management
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Manage customers, credit limits & reminders
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link to="/dashboard">
+                <Button variant="ghost" size="icon">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+              <div>
+                <h1 className="font-display text-xl font-bold text-foreground">
+                  Customer Management
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Manage customers, credit limits & reminders
+                </p>
+              </div>
             </div>
+            {userRole === "admin" && (
+              <Button onClick={() => {
+                setFormData(initialFormData);
+                setIsAddingCustomer(true);
+              }}>
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add Customer
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -369,13 +604,34 @@ const CustomersPage = () => {
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          {userRole === "admin" && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openEditDialog(customer)}
+                              >
+                                <Edit2 className="w-4 h-4 mr-1" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50"
+                                onClick={() => openDeleteDialog(customer)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Delete
+                              </Button>
+                            </>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => openCreditLimitDialog(customer)}
                           >
-                            <Edit2 className="w-4 h-4 mr-1" />
+                            <IndianRupee className="w-4 h-4 mr-1" />
                             Edit Limit
                           </Button>
                           {customer.totalOutstanding > 0 && customer.phone && (
@@ -385,7 +641,7 @@ const CustomersPage = () => {
                               onClick={() => openReminderDialog(customer)}
                             >
                               <Bell className="w-4 h-4 mr-1" />
-                              Send Reminder
+                              Reminder
                             </Button>
                           )}
                         </div>
@@ -461,6 +717,153 @@ const CustomersPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add/Edit Customer Dialog */}
+      <Dialog 
+        open={isAddingCustomer || isEditingCustomer} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsAddingCustomer(false);
+            setIsEditingCustomer(false);
+            setFormData(initialFormData);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {isAddingCustomer ? "Add New Customer" : "Edit Customer Details"}
+            </DialogTitle>
+            <DialogDescription>
+              {isAddingCustomer 
+                ? "Add a new customer to the system." 
+                : `Update details for ${selectedCustomer?.full_name}`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="full_name">Full Name *</Label>
+              <Input
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                placeholder="Enter customer name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="business_name">Business Name</Label>
+              <Input
+                id="business_name"
+                value={formData.business_name}
+                onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
+                placeholder="Enter business name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="Enter email"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Enter address"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="gst_number">GST Number</Label>
+                <Input
+                  id="gst_number"
+                  value={formData.gst_number}
+                  onChange={(e) => setFormData({ ...formData, gst_number: e.target.value })}
+                  placeholder="Enter GST number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="credit_limit">Credit Limit (₹)</Label>
+                <Input
+                  id="credit_limit"
+                  type="number"
+                  value={formData.credit_limit}
+                  onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
+                  placeholder="50000"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsAddingCustomer(false);
+                setIsEditingCustomer(false);
+                setFormData(initialFormData);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={isAddingCustomer ? handleAddCustomer : handleEditCustomer}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              {isAddingCustomer ? "Add Customer" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeletingCustomer} onOpenChange={setIsDeletingCustomer}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{selectedCustomer?.full_name}</strong>? 
+              This action cannot be undone and will remove all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCustomer}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
