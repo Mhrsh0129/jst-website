@@ -3,5 +3,14 @@ project_id = "sqfzyyemlfmbpmxtwacs"
 [functions.ai-chat]
 verify_jwt = false
 
+[functions.create-customer]
+verify_jwt = false
+
+[functions.create-ca-user]
+verify_jwt = false
+
 [functions.create-test-users]
+verify_jwt = false
+
+[functions.create-admin-user]
 verify_jwt = false

@@ -1,9 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// CORS headers - restricted to localhost for development
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'http://localhost:8080',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Max-Age': '86400',
 };
 
 serve(async (req) => {
@@ -29,7 +32,7 @@ serve(async (req) => {
 
     const caUser = {
       email: "ca@jst.com",
-      password: "ca123456",
+      password: "ca12345",
       full_name: "Chartered Accountant",
       business_name: "Jay Shree Traders",
       phone: "9999999999",

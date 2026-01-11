@@ -125,9 +125,9 @@ const CustomersPage = () => {
     if (!loading && !user) {
       navigate("/auth");
     }
-    // Only admin can access customers page, not CA
+    // Only admin can access customers page, CA can only view bills
     if (!loading && user && userRole !== "admin") {
-      navigate("/dashboard");
+      navigate("/bills");
     }
   }, [user, userRole, loading, navigate]);
 
@@ -307,6 +307,9 @@ const CustomersPage = () => {
 
       // Call edge function to create customer with proper auth user
       const { data, error } = await supabase.functions.invoke("create-customer", {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
         body: {
           full_name: formData.full_name.trim(),
           business_name: formData.business_name.trim() || null,

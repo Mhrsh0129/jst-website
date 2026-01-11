@@ -205,7 +205,11 @@ const ProductsPage = () => {
     if (!loading && !user) {
       navigate("/auth");
     }
-  }, [user, loading, navigate]);
+    // CA can only view bills, redirect them
+    if (!loading && user && userRole === "ca") {
+      navigate("/bills");
+    }
+  }, [user, loading, navigate, userRole]);
 
   const fetchProducts = useCallback(async () => {
     if (!user) return;

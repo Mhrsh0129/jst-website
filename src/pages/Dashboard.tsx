@@ -55,7 +55,11 @@ const Dashboard = () => {
     if (!loading && !user) {
       navigate("/auth");
     }
-  }, [user, loading, navigate]);
+    // CA can only view bills, redirect them to bills page
+    if (!loading && user && userRole === "ca") {
+      navigate("/bills");
+    }
+  }, [user, loading, navigate, userRole]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -212,6 +216,7 @@ const Dashboard = () => {
             </>
           )}
 
+          {userRole !== "ca" && (
           <div className="bg-card rounded-xl p-6 shadow-soft">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center">
@@ -225,6 +230,7 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+          )}
 
           <div className="bg-card rounded-xl p-6 shadow-soft">
             <div className="flex items-center gap-4">
@@ -375,61 +381,63 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Recent Orders */}
-          <div className="bg-card rounded-xl p-6 shadow-soft">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-semibold text-foreground">
-                Recent Orders
-              </h2>
-              <Link to="/orders" className="text-sm text-accent hover:underline">
-                View all
-              </Link>
+          {/* Recent Orders - Hide for CA */}
+          {userRole !== "ca" && (
+            <div className="bg-card rounded-xl p-6 shadow-soft">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg font-semibold text-foreground">
+                  Recent Orders
+                </h2>
+                <Link to="/orders" className="text-sm text-accent hover:underline">
+                  View all
+                </Link>
+              </div>
+              
+              {isLoadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : orders.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-8">
+                  No orders yet. Start by browsing our products!
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {orders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    >
+                      <div>
+                        <p className="font-medium text-foreground text-sm">
+                          {order.order_number}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(order.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-foreground">
+                          ₹{Number(order.total_amount).toLocaleString()}
+                        </p>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            order.status === "completed"
+                              ? "bg-green-500/20 text-green-600"
+                              : order.status === "processing"
+                              ? "bg-blue-500/20 text-blue-600"
+                              : "bg-amber-500/20 text-amber-600"
+                          }`}
+                        >
+                          {order.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            
-            {isLoadingData ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-              </div>
-            ) : orders.length === 0 ? (
-              <p className="text-muted-foreground text-sm text-center py-8">
-                No orders yet. Start by browsing our products!
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {orders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium text-foreground text-sm">
-                        {order.order_number}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-foreground">
-                        ₹{Number(order.total_amount).toLocaleString()}
-                      </p>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          order.status === "completed"
-                            ? "bg-green-500/20 text-green-600"
-                            : order.status === "processing"
-                            ? "bg-blue-500/20 text-blue-600"
-                            : "bg-amber-500/20 text-amber-600"
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
         </div>
       </main>
     </div>

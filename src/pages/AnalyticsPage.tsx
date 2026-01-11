@@ -63,9 +63,9 @@ const AnalyticsPage = () => {
     if (!loading && !user) {
       navigate("/auth");
     }
-    // Only admin can access analytics, not CA
+    // Only admin can access analytics, redirect CA and customers to bills
     if (!loading && user && userRole !== "admin") {
-      navigate("/dashboard");
+      navigate("/bills");
     }
   }, [user, userRole, loading, navigate]);
 

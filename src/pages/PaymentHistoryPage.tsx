@@ -33,7 +33,7 @@ interface PaymentWithBill extends Payment {
 }
 
 const PaymentHistoryPage = () => {
-  const { user, loading } = useAuth();
+  const { user, userRole, loading } = useAuth();
   const navigate = useNavigate();
   const [payments, setPayments] = useState<PaymentWithBill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +43,11 @@ const PaymentHistoryPage = () => {
     if (!loading && !user) {
       navigate("/auth");
     }
-  }, [user, loading, navigate]);
+    // CA can only view bills, redirect them
+    if (!loading && user && userRole === "ca") {
+      navigate("/bills");
+    }
+  }, [user, loading, navigate, userRole]);
 
   useEffect(() => {
     const fetchPayments = async () => {
