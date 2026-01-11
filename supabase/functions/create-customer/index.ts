@@ -1,0 +1,134 @@
+// @ts-nocheck
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+
+// Input validation helpers
+function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+}
+
+function validatePhone(phone: string): boolean {
+  const phoneRegex = /^[\d\s+\-()]+$/;
+  return phoneRegex.test(phone) && phone.length >= 10 && phone.length <= 20;
+}
+
+function sanitizeInput(input: string): string {
+  return input.trim().slice(0, 500); // Limit length and trim whitespace
+}
+
+// CORS headers - restricted to localhost for development
+const corsHeaders: Record<string, string> = {
+  "Access-Control-Allow-Origin": "http://localhost:8080",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Max-Age": "86400",
+};
+
+serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+    let { full_name, business_name, phone, email, address, gst_number, credit_limit } = body;
+
+    // Input validation
+    if (!full_name || typeof full_name !== "string") {
+      return new Response(JSON.stringify({ error: "Full name is required and must be a string" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Sanitize and validate inputs
+    full_name = sanitizeInput(full_name);
+    if (full_name.length < 2 || full_name.length > 100) {
+      return new Response(JSON.stringify({ error: "Full name must be 2-100 characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (phone && (typeof phone !== "string" || !validatePhone(phone))) {
+      return new Response(JSON.stringify({ error: "Invalid phone format" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (email && (typeof email !== "string" || !validateEmail(email))) {
+      return new Response(JSON.stringify({ error: "Invalid email format" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Sanitize optional fields
+    business_name = business_name ? sanitizeInput(String(business_name)) : null;
+    phone = phone ? sanitizeInput(String(phone)) : null;
+    email = email ? sanitizeInput(String(email)) : null;
+    address = address ? sanitizeInput(String(address)) : null;
+    gst_number = gst_number ? sanitizeInput(String(gst_number)) : null;
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    let loginEmail = email || `${phone}@jst.local`;
+    let loginPassword = phone || `JST${Math.random().toString(36).slice(-8)}`;
+
+    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+      email: loginEmail,
+      password: loginPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: full_name.trim(),
+        business_name: business_name || "",
+        phone: phone || "",
+      },
+    });
+
+    if (createError) {
+      return new Response(JSON.stringify({ error: `Auth error: ${createError.message}` }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { error: profileError } = await adminClient
+      .from("profiles")
+      .update({
+        full_name,
+        business_name,
+        phone,
+        email,
+        address,
+        gst_number,
+      })
+      .eq("user_id", newUser.user.id);
+
+    if (profileError) {
+      console.error("Profile update error:", profileError.message);
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        user_id: newUser.user.id,
+        email: loginEmail,
+        password: loginPassword,
+        message: "Customer created successfully",
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
