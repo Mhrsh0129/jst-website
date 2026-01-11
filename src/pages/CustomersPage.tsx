@@ -38,10 +38,12 @@ import {
   Save,
   FileText,
   Receipt,
+  CheckCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AddBillDialog from "@/components/AddBillDialog";
 import CustomerBillsDialog from "@/components/CustomerBillsDialog";
+import RecordPaymentDialog from "@/components/RecordPaymentDialog";
 
 interface Profile {
   id: string;
@@ -109,6 +111,10 @@ const CustomersPage = () => {
   // State for viewing customer bills
   const [isViewingBills, setIsViewingBills] = useState(false);
   const [viewingBillsCustomer, setViewingBillsCustomer] = useState<CustomerWithBalance | null>(null);
+  
+  // State for recording payment
+  const [isRecordingPayment, setIsRecordingPayment] = useState(false);
+  const [paymentCustomer, setPaymentCustomer] = useState<CustomerWithBalance | null>(null);
   
   // State for customer name autocomplete
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
@@ -492,6 +498,41 @@ const CustomersPage = () => {
     setIsViewingBills(true);
   };
 
+  // Open record payment dialog
+  const openRecordPaymentDialog = (customer: CustomerWithBalance) => {
+    setPaymentCustomer(customer);
+    setIsRecordingPayment(true);
+  };
+
+  // Refresh customers after payment recorded
+  const handlePaymentRecorded = async () => {
+    // Refetch customer balances
+    try {
+      const { data: billsData } = await supabase
+        .from("bills")
+        .select("customer_id, balance_due, paid_amount");
+
+      const balanceMap = new Map<string, { outstanding: number; paid: number }>();
+      billsData?.forEach(bill => {
+        const existing = balanceMap.get(bill.customer_id) || { outstanding: 0, paid: 0 };
+        balanceMap.set(bill.customer_id, {
+          outstanding: existing.outstanding + Number(bill.balance_due),
+          paid: existing.paid + Number(bill.paid_amount),
+        });
+      });
+
+      setCustomers(prev =>
+        prev.map(customer => ({
+          ...customer,
+          totalOutstanding: balanceMap.get(customer.user_id)?.outstanding || 0,
+          totalPaid: balanceMap.get(customer.user_id)?.paid || 0,
+        }))
+      );
+    } catch (error) {
+      console.error("Error refreshing balances:", error);
+    }
+  };
+
   // Handle name input change for autocomplete
   const handleNameInputChange = (value: string) => {
     setFormData({ ...formData, full_name: value });
@@ -782,6 +823,17 @@ const CustomersPage = () => {
                                 <FileText className="w-4 h-4 mr-1" />
                                 Add Bill
                               </Button>
+                              {customer.totalOutstanding > 0 && (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700"
+                                  onClick={() => openRecordPaymentDialog(customer)}
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Payment Done
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1160,6 +1212,20 @@ const CustomersPage = () => {
           }}
           customerUserId={viewingBillsCustomer.user_id}
           customerName={viewingBillsCustomer.full_name}
+        />
+      )}
+
+      {/* Record Payment Dialog */}
+      {paymentCustomer && (
+        <RecordPaymentDialog
+          isOpen={isRecordingPayment}
+          onClose={() => {
+            setIsRecordingPayment(false);
+            setPaymentCustomer(null);
+          }}
+          customerId={paymentCustomer.user_id}
+          customerName={paymentCustomer.full_name}
+          onPaymentRecorded={handlePaymentRecorded}
         />
       )}
     </div>
