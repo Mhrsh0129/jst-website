@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,8 +36,10 @@ import {
   UserPlus,
   Trash2,
   Save,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import AddBillDialog from "@/components/AddBillDialog";
 
 interface Profile {
   id: string;
@@ -97,6 +99,15 @@ const CustomersPage = () => {
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // State for add bill dialog
+  const [isAddingBill, setIsAddingBill] = useState(false);
+  const [billCustomer, setBillCustomer] = useState<CustomerWithBalance | null>(null);
+  
+  // State for customer name autocomplete
+  const [showNameSuggestions, setShowNameSuggestions] = useState(false);
+  const [nameSuggestions, setNameSuggestions] = useState<CustomerWithBalance[]>([]);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -462,6 +473,100 @@ const CustomersPage = () => {
     setIsDeletingCustomer(true);
   };
 
+  // Open add bill dialog
+  const openAddBillDialog = (customer: CustomerWithBalance) => {
+    setBillCustomer(customer);
+    setIsAddingBill(true);
+  };
+
+  // Handle name input change for autocomplete
+  const handleNameInputChange = (value: string) => {
+    setFormData({ ...formData, full_name: value });
+    
+    if (isAddingCustomer && value.length >= 2) {
+      const matches = customers.filter(
+        c => c.full_name.toLowerCase().includes(value.toLowerCase()) ||
+             c.business_name?.toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 5);
+      setNameSuggestions(matches);
+      setShowNameSuggestions(matches.length > 0);
+    } else {
+      setShowNameSuggestions(false);
+    }
+  };
+
+  // Select existing customer from suggestions
+  const selectExistingCustomer = (customer: CustomerWithBalance) => {
+    setFormData({
+      full_name: customer.full_name,
+      business_name: customer.business_name || "",
+      phone: customer.phone || "",
+      email: customer.email || "",
+      address: customer.address || "",
+      gst_number: customer.gst_number || "",
+      credit_limit: customer.credit_limit.toString(),
+      password: "",
+    });
+    setShowNameSuggestions(false);
+    
+    // Show option to add bill instead
+    toast({
+      title: "Existing Customer Found",
+      description: `${customer.full_name} already exists. You can add a bill to their account instead.`,
+      action: (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setIsAddingCustomer(false);
+            setFormData(initialFormData);
+            openAddBillDialog(customer);
+          }}
+        >
+          Add Bill
+        </Button>
+      ),
+      duration: 10000,
+    });
+  };
+
+  // Refresh customer data after adding bill
+  const refreshCustomers = async () => {
+    try {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("full_name");
+
+      if (profilesError) throw profilesError;
+
+      const { data: billsData } = await supabase
+        .from("bills")
+        .select("customer_id, balance_due, paid_amount");
+
+      const balanceMap = new Map<string, { outstanding: number; paid: number }>();
+      
+      billsData?.forEach(bill => {
+        const existing = balanceMap.get(bill.customer_id) || { outstanding: 0, paid: 0 };
+        balanceMap.set(bill.customer_id, {
+          outstanding: existing.outstanding + Number(bill.balance_due),
+          paid: existing.paid + Number(bill.paid_amount),
+        });
+      });
+
+      const customersWithBalances = profilesData?.map(profile => ({
+        ...profile,
+        credit_limit: profile.credit_limit || 50000,
+        totalOutstanding: balanceMap.get(profile.user_id)?.outstanding || 0,
+        totalPaid: balanceMap.get(profile.user_id)?.paid || 0,
+      })) || [];
+
+      setCustomers(customersWithBalances);
+    } catch (error) {
+      console.error("Error refreshing customers:", error);
+    }
+  };
+
   const filteredCustomers = customers.filter(
     c =>
       c.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -649,6 +754,14 @@ const CustomersPage = () => {
                           {userRole === "admin" && (
                             <>
                               <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => openAddBillDialog(customer)}
+                              >
+                                <FileText className="w-4 h-4 mr-1" />
+                                Add Bill
+                              </Button>
+                              <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openEditDialog(customer)}
@@ -675,7 +788,7 @@ const CustomersPage = () => {
                               </Button>
                               {customer.totalOutstanding > 0 && customer.phone && (
                                 <Button
-                                  variant="default"
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => openReminderDialog(customer)}
                                 >
@@ -782,15 +895,66 @@ const CustomersPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Label htmlFor="full_name">Full Name *</Label>
               <Input
                 id="full_name"
+                ref={nameInputRef}
                 value={formData.full_name}
-                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                onChange={(e) => handleNameInputChange(e.target.value)}
+                onFocus={() => {
+                  if (isAddingCustomer && formData.full_name.length >= 2) {
+                    const matches = customers.filter(
+                      c => c.full_name.toLowerCase().includes(formData.full_name.toLowerCase())
+                    ).slice(0, 5);
+                    if (matches.length > 0) {
+                      setNameSuggestions(matches);
+                      setShowNameSuggestions(true);
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  // Delay hiding to allow click on suggestion
+                  setTimeout(() => setShowNameSuggestions(false), 200);
+                }}
                 placeholder="Enter customer name"
                 maxLength={100}
+                autoComplete="off"
               />
+              {/* Autocomplete Suggestions */}
+              {showNameSuggestions && isAddingCustomer && nameSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div className="p-2 text-xs text-muted-foreground border-b border-border">
+                    Existing customers matching "{formData.full_name}"
+                  </div>
+                  {nameSuggestions.map((customer) => (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      className="w-full px-3 py-2 text-left hover:bg-muted/50 flex items-center justify-between gap-2"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectExistingCustomer(customer);
+                      }}
+                    >
+                      <div>
+                        <p className="font-medium text-sm text-foreground">{customer.full_name}</p>
+                        {customer.business_name && (
+                          <p className="text-xs text-muted-foreground">{customer.business_name}</p>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        ₹{customer.totalOutstanding.toLocaleString()} due
+                      </div>
+                    </button>
+                  ))}
+                  <div className="p-2 border-t border-border bg-muted/30">
+                    <p className="text-xs text-muted-foreground">
+                      💡 Click to auto-fill or continue typing to add new customer
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="business_name">Business Name</Label>
@@ -949,6 +1113,21 @@ const CustomersPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Bill Dialog */}
+      {billCustomer && (
+        <AddBillDialog
+          isOpen={isAddingBill}
+          onClose={() => {
+            setIsAddingBill(false);
+            setBillCustomer(null);
+          }}
+          customerId={billCustomer.id}
+          customerUserId={billCustomer.user_id}
+          customerName={billCustomer.full_name}
+          onBillAdded={refreshCustomers}
+        />
+      )}
     </div>
   );
 };
