@@ -15,6 +15,8 @@ interface AuthContextType {
     phone: string;
   }) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithOtp: (phone: string) => Promise<{ error: Error | null }>;
+  verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -123,6 +125,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  const signInWithOtp = async (phone: string) => {
+    // Format phone number with country code if not present
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+    
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: formattedPhone,
+    });
+
+    return { error };
+  };
+
+  const verifyOtp = async (phone: string, token: string) => {
+    const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
+    
+    const { error } = await supabase.auth.verifyOtp({
+      phone: formattedPhone,
+      token,
+      type: 'sms',
+    });
+
+    return { error };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -139,6 +164,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loading,
         signUp,
         signIn,
+        signInWithOtp,
+        verifyOtp,
         signOut,
       }}
     >
