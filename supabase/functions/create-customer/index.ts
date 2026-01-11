@@ -57,7 +57,7 @@ serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (roleError || roleData?.role !== "admin") {
       console.error("User is not admin:", user.id);
@@ -183,7 +183,7 @@ serve(async (req) => {
       .from("profiles")
       .select("*")
       .eq("user_id", newUser.user.id)
-      .single();
+      .maybeSingle();
 
     if (fetchError) {
       console.error("Error fetching profile:", fetchError);

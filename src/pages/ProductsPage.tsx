@@ -393,11 +393,20 @@ const ProductsPage = () => {
   }, [editingProduct, formData, toast]);
 
   const handleDeleteProduct = useCallback(async (product: Product) => {
-    if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return;
+    // Use a more reliable confirmation approach
+    const confirmed = window.confirm(`Are you sure you want to delete "${product.name}"? This action cannot be undone.`);
+    if (!confirmed) return;
 
     try {
-      const { error } = await supabase.from("products").delete().eq("id", product.id);
-      if (error) throw error;
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", product.id);
+      
+      if (error) {
+        console.error("Delete error:", error);
+        throw error;
+      }
 
       setProducts(prev => prev.filter(p => p.id !== product.id));
       toast({ title: "Product deleted", description: `${product.name} has been removed.` });
@@ -405,7 +414,7 @@ const ProductsPage = () => {
       console.error("Error deleting product:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to delete product.",
+        description: error.message || "Failed to delete product. Make sure you have admin permissions.",
         variant: "destructive",
       });
     }
