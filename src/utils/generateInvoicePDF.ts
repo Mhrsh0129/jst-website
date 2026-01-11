@@ -250,11 +250,10 @@ export const generateInvoicePDF = (
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
-  doc.text("Bank: State Bank of India", 20, bankY + 18);
+  doc.text("Bank: HDFC Bank", 20, bankY + 18);
   doc.text("Account Name: Jay Shree Traders", 20, bankY + 25);
-  doc.text("Account No: 1234567890123", 100, bankY + 18);
-  doc.text("IFSC: SBIN0012345", 100, bankY + 25);
-  doc.text("UPI: 8319621211@ybl", 20, bankY + 32);
+  doc.text("Account No: 50200101611788", 100, bankY + 18);
+  doc.text("IFSC: HDFC0005222", 100, bankY + 25);
 
   // Footer
   const footerY = doc.internal.pageSize.getHeight() - 20;
