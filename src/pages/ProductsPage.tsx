@@ -11,6 +11,7 @@ import {
   IndianRupee,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import AIChatWidget from "@/components/AIChatWidget";
 
 interface Product {
   id: string;
@@ -249,6 +250,9 @@ const ProductsPage = () => {
           </div>
         )}
       </main>
+
+      {/* AI Product Assistant Chat */}
+      <AIChatWidget type="product" title="Product Assistant" />
     </div>
   );
 };
