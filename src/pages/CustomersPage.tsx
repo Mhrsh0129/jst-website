@@ -269,6 +269,18 @@ const CustomersPage = () => {
 
     setIsSaving(true);
     try {
+      // Get current session to verify we're authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Session Expired",
+          description: "Please log in again to add customers.",
+          variant: "destructive",
+        });
+        navigate("/auth");
+        return;
+      }
+
       // Call edge function to create customer with proper auth user
       const { data, error } = await supabase.functions.invoke("create-customer", {
         body: {

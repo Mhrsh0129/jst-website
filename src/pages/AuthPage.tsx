@@ -286,7 +286,7 @@ const AuthPage = () => {
         if (error.message.includes("Invalid login credentials")) {
           toast({
             title: "Login Failed",
-            description: "Invalid phone number. Please check and try again, or contact admin.",
+            description: "Phone number not found. Only customers added by admin with phone login enabled can use this. Try email login or contact admin.",
             variant: "destructive",
           });
         } else {

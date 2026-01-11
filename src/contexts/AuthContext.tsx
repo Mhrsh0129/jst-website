@@ -131,10 +131,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const cleanPhone = phone.replace(/\D/g, '');
     const phoneEmail = `${cleanPhone}@jst.local`;
     
+    console.log("Attempting phone login with email:", phoneEmail);
+    
     const { error } = await supabase.auth.signInWithPassword({
       email: phoneEmail,
       password: cleanPhone,
     });
+
+    if (error) {
+      console.error("Phone login error:", error.message);
+    }
 
     return { error };
   };
