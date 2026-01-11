@@ -45,12 +45,12 @@ const ThemeToggle = ({ variant = "default" }: ThemeToggleProps) => {
       variant={variant === "transparent" ? "ghost" : "outline"}
       size="icon"
       onClick={toggleTheme}
-      className={variant === "transparent" ? "text-inherit hover:bg-white/10" : ""}
+      className={variant === "transparent" ? "text-primary-foreground hover:bg-primary-foreground/10 border border-primary-foreground/30" : ""}
     >
       {isDark ? (
-        <Sun className="h-4 w-4" />
+        <Sun className="h-5 w-5" />
       ) : (
-        <Moon className="h-4 w-4" />
+        <Moon className="h-5 w-5" />
       )}
       <span className="sr-only">Toggle theme</span>
     </Button>
