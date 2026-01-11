@@ -141,7 +141,7 @@ const Dashboard = () => {
               </span>
               {userRole && (
                 <span className="text-xs bg-accent/20 text-accent-foreground px-2 py-1 rounded-full capitalize">
-                  {userRole}
+                  {userRole === "ca" ? "Chartered Accountant" : userRole}
                 </span>
               )}
               <Button variant="outline" size="sm" onClick={handleSignOut}>

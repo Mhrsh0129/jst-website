@@ -30,7 +30,7 @@ serve(async (req) => {
     const caUser = {
       email: "ca@jst.com",
       password: "ca123456",
-      full_name: "Credit Agent",
+      full_name: "Chartered Accountant",
       business_name: "Jay Shree Traders",
       phone: "9999999999",
     };
