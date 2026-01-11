@@ -230,7 +230,7 @@ const CustomersPage = () => {
   const openReminderDialog = (customer: CustomerWithBalance) => {
     setSelectedCustomer(customer);
     setReminderMessage(
-      `Dear ${customer.full_name},\n\nThis is a friendly reminder that you have an outstanding balance of ₹${customer.totalOutstanding.toLocaleString()} with Jay Shree Traders.\n\nPlease clear your dues at the earliest convenience.\n\nThank you for your business!`
+      `प्रिय ${customer.full_name} जी,\n\nनमस्कार! आपको सूचित किया जाता है कि Jay Shree Traders में आपका ₹${customer.totalOutstanding.toLocaleString()} का बकाया है।\n\nकृपया जल्द से जल्द भुगतान करें।\n\nधन्यवाद!\nजय श्री ट्रेडर्स`
     );
     setSendingReminder(true);
   };
@@ -624,25 +624,25 @@ const CustomersPage = () => {
                                 <Trash2 className="w-4 h-4 mr-1" />
                                 Delete
                               </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openCreditLimitDialog(customer)}
+                              >
+                                <IndianRupee className="w-4 h-4 mr-1" />
+                                Edit Limit
+                              </Button>
+                              {customer.totalOutstanding > 0 && customer.phone && (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => openReminderDialog(customer)}
+                                >
+                                  <Bell className="w-4 h-4 mr-1" />
+                                  Reminder
+                                </Button>
+                              )}
                             </>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openCreditLimitDialog(customer)}
-                          >
-                            <IndianRupee className="w-4 h-4 mr-1" />
-                            Edit Limit
-                          </Button>
-                          {customer.totalOutstanding > 0 && customer.phone && (
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => openReminderDialog(customer)}
-                            >
-                              <Bell className="w-4 h-4 mr-1" />
-                              Reminder
-                            </Button>
                           )}
                         </div>
                       </div>

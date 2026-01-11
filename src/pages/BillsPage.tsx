@@ -31,7 +31,7 @@ interface Bill {
 }
 
 const BillsPage = () => {
-  const { user, loading } = useAuth();
+  const { user, userRole, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [bills, setBills] = useState<Bill[]>([]);
@@ -295,7 +295,7 @@ const BillsPage = () => {
                       )}
                       Download
                     </Button>
-                    {Number(bill.balance_due) > 0 && (
+                    {Number(bill.balance_due) > 0 && userRole === "customer" && (
                       <Button
                         variant="gold"
                         size="sm"
