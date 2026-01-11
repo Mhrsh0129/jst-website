@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -58,6 +59,7 @@ const Navbar = () => {
                 {link.name}
               </a>
             ))}
+            <ThemeToggle variant={isScrolled ? "default" : "transparent"} />
             <Link to="/auth">
               <Button
                 variant={isScrolled ? "default" : "heroOutline"}
@@ -103,6 +105,10 @@ const Navbar = () => {
                   {link.name}
                 </a>
               ))}
+              <div className="flex items-center justify-between py-2">
+                <span className="text-foreground/80">Theme</span>
+                <ThemeToggle />
+              </div>
               <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button variant="default" className="w-full">
                   Login
