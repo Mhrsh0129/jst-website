@@ -254,10 +254,14 @@ const CustomersPage = () => {
       return;
     }
 
-    if (!formData.email.trim() || !formData.email.includes("@")) {
+    // Either email or phone is required
+    const hasEmail = formData.email.trim() && formData.email.includes("@");
+    const hasPhone = formData.phone.trim().length >= 10;
+    
+    if (!hasEmail && !hasPhone) {
       toast({
         title: "Validation Error",
-        description: "Valid email is required for customer login.",
+        description: "Either a valid email or 10-digit phone number is required for customer login.",
         variant: "destructive",
       });
       return;
@@ -271,7 +275,7 @@ const CustomersPage = () => {
           full_name: formData.full_name.trim(),
           business_name: formData.business_name.trim() || null,
           phone: formData.phone.trim() || null,
-          email: formData.email.trim(),
+          email: formData.email.trim() || null,
           address: formData.address.trim() || null,
           gst_number: formData.gst_number.trim() || null,
           credit_limit: parseFloat(formData.credit_limit) || 50000,
@@ -788,34 +792,52 @@ const CustomersPage = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone">Phone {isAddingCustomer && "*"}</Label>
                 <Input
                   id="phone"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="Enter phone number"
-                  maxLength={15}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormData({ ...formData, phone: value });
+                  }}
+                  placeholder="10-digit number"
+                  maxLength={10}
                 />
+                {isAddingCustomer && (
+                  <p className="text-xs text-muted-foreground">Customer can login with this</p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email {isAddingCustomer && "*"}</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Enter email"
+                  placeholder="Enter email (optional)"
                   maxLength={255}
-                  required={isAddingCustomer}
                 />
                 {isAddingCustomer && (
-                  <p className="text-xs text-muted-foreground">Required for customer login</p>
+                  <p className="text-xs text-muted-foreground">Or use email for login</p>
                 )}
               </div>
             </div>
             {isAddingCustomer && (
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm font-medium text-foreground mb-1">Login Method</p>
+                <p className="text-xs text-muted-foreground">
+                  {formData.phone.length >= 10 
+                    ? `✅ Phone login enabled: Customer can login with phone ${formData.phone} (password = phone number)`
+                    : formData.email.includes("@")
+                    ? "📧 Email login: Enter a password below or leave empty to auto-generate"
+                    : "Enter phone (10 digits) or email to enable customer login"
+                  }
+                </p>
+              </div>
+            )}
+            {isAddingCustomer && !formData.phone && formData.email.includes("@") && (
               <div className="space-y-2">
-                <Label htmlFor="password">Password (optional)</Label>
+                <Label htmlFor="password">Password (optional for email login)</Label>
                 <Input
                   id="password"
                   type="password"

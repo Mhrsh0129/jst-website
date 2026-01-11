@@ -28,7 +28,7 @@ const phoneSchema = z.object({
   phone: z.string().min(10, "Please enter a valid 10-digit phone number").max(10, "Please enter a valid 10-digit phone number"),
 });
 
-type AuthMode = "login" | "register" | "otp";
+type AuthMode = "login" | "register" | "otp" | "phone-login";
 type OtpStep = "phone" | "verify";
 
 const AuthPage = () => {
@@ -38,7 +38,7 @@ const AuthPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [otpValue, setOtpValue] = useState("");
   const { toast } = useToast();
-  const { signIn, signUp, signInWithOtp, verifyOtp } = useAuth();
+  const { signIn, signUp, signInWithPhone, signInWithOtp, verifyOtp } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -263,6 +263,57 @@ const AuthPage = () => {
     setOtpStep("phone");
     setOtpValue("");
     setErrors({});
+    setFormData({ ...formData, phone: "", email: "", password: "" });
+  };
+
+  const handlePhoneLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+    setIsLoading(true);
+
+    try {
+      const result = phoneSchema.safeParse({ phone: formData.phone });
+
+      if (!result.success) {
+        setErrors({ phone: result.error.errors[0].message });
+        setIsLoading(false);
+        return;
+      }
+
+      const { error } = await signInWithPhone(formData.phone);
+
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) {
+          toast({
+            title: "Login Failed",
+            description: "Invalid phone number. Please check and try again, or contact admin.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Login Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      toast({
+        title: "Welcome back!",
+        description: "You have successfully logged in.",
+      });
+      navigate("/dashboard");
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    }
+
+    setIsLoading(false);
   };
 
   return (
@@ -284,18 +335,20 @@ const AuthPage = () => {
             <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground mb-2">
               {authMode === "login" && "Welcome Back"}
               {authMode === "register" && "Create Account"}
+              {authMode === "phone-login" && "Quick Login"}
               {authMode === "otp" && (otpStep === "phone" ? "Login with OTP" : "Enter OTP")}
             </h1>
             <p className="text-muted-foreground text-sm">
               {authMode === "login" && "Login to access wholesale prices and orders"}
               {authMode === "register" && "Register to become a wholesale partner"}
+              {authMode === "phone-login" && "Enter your registered phone number"}
               {authMode === "otp" && otpStep === "phone" && "Enter your phone number to receive OTP"}
               {authMode === "otp" && otpStep === "verify" && `Enter the 4-digit code sent to +91${formData.phone}`}
             </p>
           </div>
 
           {/* Toggle - only show for login/register */}
-          {authMode !== "otp" && (
+          {(authMode === "login" || authMode === "register") && (
             <div className="flex bg-muted rounded-lg p-1 mb-6">
               <button
                 type="button"
@@ -320,6 +373,18 @@ const AuthPage = () => {
                 Register
               </button>
             </div>
+          )}
+
+          {/* Phone Login back button */}
+          {authMode === "phone-login" && (
+            <button
+              type="button"
+              onClick={() => resetAuthMode("login")}
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm mb-4"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Email Login
+            </button>
           )}
 
           {/* OTP Back button */}
@@ -424,9 +489,84 @@ const AuthPage = () => {
                 variant="outline"
                 size="lg"
                 className="w-full"
-                onClick={() => resetAuthMode("otp")}
+                onClick={() => resetAuthMode("phone-login")}
               >
                 <Phone className="w-5 h-5" />
+                Login with Phone Number
+              </Button>
+            </form>
+          )}
+
+          {/* Phone Login Form */}
+          {authMode === "phone-login" && (
+            <form onSubmit={handlePhoneLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Phone Number
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-input bg-muted text-muted-foreground text-sm">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setFormData({ ...formData, phone: value });
+                    }}
+                    className={`flex-1 px-4 py-3 rounded-r-xl border ${
+                      errors.phone ? "border-destructive" : "border-input"
+                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
+                    placeholder="Enter 10-digit number"
+                    maxLength={10}
+                  />
+                </div>
+                {errors.phone && (
+                  <p className="text-destructive text-xs mt-1">{errors.phone}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Use your registered phone number to login instantly
+                </p>
+              </div>
+
+              <Button
+                type="submit"
+                variant="hero"
+                size="lg"
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Logging in...
+                  </>
+                ) : (
+                  <>
+                    <Phone className="w-5 h-5" />
+                    Login
+                  </>
+                )}
+              </Button>
+
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-muted" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="w-full"
+                onClick={() => resetAuthMode("otp")}
+              >
+                <Mail className="w-5 h-5" />
                 Login with OTP
               </Button>
             </form>

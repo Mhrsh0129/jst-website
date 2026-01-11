@@ -77,9 +77,10 @@ serve(async (req) => {
       );
     }
 
-    if (!email || typeof email !== "string" || !email.includes("@")) {
+    // Either email or phone is required
+    if ((!email || !email.includes("@")) && (!phone || phone.length < 10)) {
       return new Response(
-        JSON.stringify({ error: "Valid email is required for customer login" }),
+        JSON.stringify({ error: "Valid email or phone number is required for customer login" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -102,20 +103,39 @@ serve(async (req) => {
     // Create admin client to create auth user
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Generate a secure password if not provided
-    const customerPassword = password || `JST-${Math.random().toString(36).slice(-8)}${Date.now().toString(36)}`;
+    // Clean phone number
+    const cleanPhone = phone?.replace(/\D/g, '') || '';
+    
+    // Determine login credentials
+    // If phone provided, use phone@jst.local as email and phone as password
+    // Otherwise use provided email and password
+    let loginEmail: string;
+    let loginPassword: string;
+    
+    if (cleanPhone && cleanPhone.length >= 10) {
+      loginEmail = `${cleanPhone}@jst.local`;
+      loginPassword = cleanPhone;
+    } else if (email && email.includes("@")) {
+      loginEmail = email.trim();
+      loginPassword = password || `JST-${Math.random().toString(36).slice(-8)}${Date.now().toString(36)}`;
+    } else {
+      return new Response(
+        JSON.stringify({ error: "Valid email or phone number is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    console.log(`Creating customer auth user for: ${email}`);
+    console.log(`Creating customer auth user for: ${loginEmail}`);
 
     // Create the auth user
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-      email: email.trim(),
-      password: customerPassword,
+      email: loginEmail,
+      password: loginPassword,
       email_confirm: true, // Auto-confirm email
       user_metadata: {
         full_name: full_name.trim(),
         business_name: business_name?.trim() || null,
-        phone: phone?.trim() || null,
+        phone: cleanPhone || null,
       },
     });
 
@@ -133,8 +153,9 @@ serve(async (req) => {
     const { error: profileError } = await adminClient
       .from("profiles")
       .update({
+        email: email?.trim() || null,
         business_name: business_name?.trim() || null,
-        phone: phone?.trim() || null,
+        phone: cleanPhone || null,
         address: address?.trim() || null,
         gst_number: gst_number?.trim() || null,
         credit_limit: credit_limit ? parseFloat(credit_limit) : 50000,
@@ -157,13 +178,20 @@ serve(async (req) => {
       console.error("Error fetching profile:", fetchError);
     }
 
+    // Determine what login info to return
+    const isPhoneLogin = loginEmail.endsWith('@jst.local');
+    const loginInfo = isPhoneLogin 
+      ? `Phone login enabled. Customer can login with phone: ${cleanPhone}`
+      : `Email login: ${loginEmail}`;
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         profile: profile,
-        message: `Customer created successfully. Login: ${email}`,
-        // Only return password if it was auto-generated (for admin to share with customer)
-        ...(password ? {} : { generatedPassword: customerPassword })
+        message: `Customer created successfully. ${loginInfo}`,
+        loginMethod: isPhoneLogin ? 'phone' : 'email',
+        // Only return password if it was auto-generated for email login
+        ...(!isPhoneLogin && !password ? { generatedPassword: loginPassword } : {})
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
