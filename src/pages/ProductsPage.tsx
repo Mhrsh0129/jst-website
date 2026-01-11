@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AIChatWidget from "@/components/AIChatWidget";
+import OrderModal from "@/components/OrderModal";
 
 interface Product {
   id: string;
@@ -30,6 +31,8 @@ const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -240,7 +243,15 @@ const ProductsPage = () => {
                   >
                     Request Sample
                   </Button>
-                  <Button variant="gold" size="sm" className="flex-1">
+                  <Button
+                    variant="gold"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedProduct(product);
+                      setIsOrderModalOpen(true);
+                    }}
+                  >
                     <ShoppingCart className="w-4 h-4" />
                     Order
                   </Button>
@@ -250,6 +261,19 @@ const ProductsPage = () => {
           </div>
         )}
       </main>
+
+      {/* Order Modal */}
+      {selectedProduct && user && (
+        <OrderModal
+          isOpen={isOrderModalOpen}
+          onClose={() => {
+            setIsOrderModalOpen(false);
+            setSelectedProduct(null);
+          }}
+          product={selectedProduct}
+          userId={user.id}
+        />
+      )}
 
       {/* AI Product Assistant Chat */}
       <AIChatWidget type="product" title="Product Assistant" />
