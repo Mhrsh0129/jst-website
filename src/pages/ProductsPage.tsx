@@ -1,25 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   ArrowLeft,
   Package,
@@ -34,6 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import AIChatWidget from "@/components/AIChatWidget";
 import OrderModal from "@/components/OrderModal";
+import ProductFormDialog, { ProductFormData } from "@/components/ProductFormDialog";
 
 interface Product {
   id: string;
@@ -46,16 +30,6 @@ interface Product {
   image_url: string | null;
 }
 
-interface ProductFormData {
-  name: string;
-  description: string;
-  price_per_meter: string;
-  category: string;
-  min_order_quantity: string;
-  stock_status: string;
-  image_url: string;
-}
-
 const initialFormData: ProductFormData = {
   name: "",
   description: "",
@@ -65,6 +39,150 @@ const initialFormData: ProductFormData = {
   stock_status: "in_stock",
   image_url: "",
 };
+
+// Memoized product card for better performance
+const ProductCard = memo(({ 
+  product, 
+  userRole, 
+  onEdit, 
+  onDelete, 
+  onRequestSample, 
+  onOrder,
+  getCategoryColor
+}: {
+  product: Product;
+  userRole: string | null;
+  onEdit: (product: Product) => void;
+  onDelete: (product: Product) => void;
+  onRequestSample: (product: Product) => void;
+  onOrder: (product: Product) => void;
+  getCategoryColor: (category: string) => string;
+}) => (
+  <div className="bg-card rounded-xl overflow-hidden shadow-soft hover:shadow-medium transition-all">
+    {/* Product Image */}
+    <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+      {product.image_url ? (
+        <img
+          src={product.image_url}
+          alt={product.name}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+            (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+          }}
+        />
+      ) : null}
+      <div className={`w-full h-full flex items-center justify-center ${product.image_url ? 'hidden' : ''}`}>
+        <ImageIcon className="w-16 h-16 text-muted-foreground/30" />
+      </div>
+      {/* Admin Edit/Delete Buttons */}
+      {userRole === "admin" && (
+        <div className="absolute top-2 right-2 flex gap-1">
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-8 w-8"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(product);
+            }}
+          >
+            <Edit2 className="w-4 h-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="destructive"
+            className="h-8 w-8"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(product);
+            }}
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+    </div>
+
+    <div className="p-6">
+      {/* Category Badge */}
+      <span
+        className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 capitalize ${getCategoryColor(
+          product.category
+        )}`}
+      >
+        {product.category}
+      </span>
+
+      {/* Product Info */}
+      <h3 className="font-display text-lg font-semibold text-foreground mb-2">
+        {product.name}
+      </h3>
+      <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+        {product.description || "Premium quality pocketing fabric"}
+      </p>
+
+      {/* Price */}
+      <div className="flex items-baseline gap-1 mb-4">
+        <IndianRupee className="w-5 h-5 text-primary" />
+        <span className="font-display text-3xl font-bold text-primary">
+          {Number(product.price_per_meter)}
+        </span>
+        <span className="text-muted-foreground text-sm">/ meter</span>
+      </div>
+
+      {/* Details */}
+      <div className="space-y-2 mb-6 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Min. Order</span>
+          <span className="font-medium text-foreground">
+            {product.min_order_quantity} meters
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Availability</span>
+          <span
+            className={`font-medium ${
+              product.stock_status === "in_stock"
+                ? "text-green-600"
+                : "text-amber-600"
+            }`}
+          >
+            {product.stock_status === "in_stock"
+              ? "In Stock"
+              : "Limited"}
+          </span>
+        </div>
+      </div>
+
+      {/* Actions - Only for customers, not admin */}
+      {userRole !== "admin" && (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            onClick={() => onRequestSample(product)}
+          >
+            Request Sample
+          </Button>
+          <Button
+            variant="gold"
+            size="sm"
+            className="flex-1"
+            onClick={() => onOrder(product)}
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Order
+          </Button>
+        </div>
+      )}
+    </div>
+  </div>
+));
+
+ProductCard.displayName = "ProductCard";
 
 const ProductsPage = () => {
   const { user, userRole, loading } = useAuth();
@@ -89,7 +207,9 @@ const ProductsPage = () => {
     }
   }, [user, loading, navigate]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
+    if (!user) return;
+    
     // Admin can see all products (including inactive), others only active
     const query = userRole === "admin"
       ? supabase.from("products").select("*").order("price_per_meter", { ascending: true })
@@ -109,33 +229,15 @@ const ProductsPage = () => {
     }
 
     setIsLoadingProducts(false);
-  };
+  }, [user, userRole, toast]);
 
   useEffect(() => {
     if (user) {
       fetchProducts();
     }
-  }, [user, userRole, toast]);
+  }, [user, fetchProducts]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  const categories = ["all", "economy", "standard", "premium"];
-  const filteredProducts =
-    selectedCategory === "all"
-      ? products
-      : products.filter((p) => p.category === selectedCategory);
-
-  const getCategoryColor = (category: string) => {
+  const getCategoryColor = useCallback((category: string) => {
     switch (category) {
       case "economy":
         return "bg-muted text-muted-foreground";
@@ -146,9 +248,10 @@ const ProductsPage = () => {
       default:
         return "bg-muted text-muted-foreground";
     }
-  };
+  }, []);
 
-  const handleRequestSample = async (product: Product) => {
+  const handleRequestSample = useCallback(async (product: Product) => {
+    if (!user) return;
     try {
       const { error } = await supabase.from("sample_requests").insert({
         customer_id: user.id,
@@ -170,15 +273,15 @@ const ProductsPage = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [user, toast]);
 
   // Admin functions
-  const openAddDialog = () => {
+  const openAddDialog = useCallback(() => {
     setFormData(initialFormData);
     setIsAddingProduct(true);
-  };
+  }, []);
 
-  const openEditDialog = (product: Product) => {
+  const openEditDialog = useCallback((product: Product) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -190,9 +293,9 @@ const ProductsPage = () => {
       image_url: product.image_url || "",
     });
     setIsEditingProduct(true);
-  };
+  }, []);
 
-  const handleAddProduct = async () => {
+  const handleAddProduct = useCallback(async () => {
     if (!formData.name.trim() || !formData.price_per_meter) {
       toast({
         title: "Validation Error",
@@ -231,9 +334,9 @@ const ProductsPage = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [formData, toast]);
 
-  const handleUpdateProduct = async () => {
+  const handleUpdateProduct = useCallback(async () => {
     if (!editingProduct || !formData.name.trim() || !formData.price_per_meter) {
       toast({
         title: "Validation Error",
@@ -287,9 +390,9 @@ const ProductsPage = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [editingProduct, formData, toast]);
 
-  const handleDeleteProduct = async (product: Product) => {
+  const handleDeleteProduct = useCallback(async (product: Product) => {
     if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return;
 
     try {
@@ -306,110 +409,37 @@ const ProductsPage = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const ProductFormDialog = ({ isOpen, onClose, title, onSubmit }: { isOpen: boolean; onClose: () => void; title: string; onSubmit: () => void }) => (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div>
-            <Label htmlFor="name">Product Name *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="e.g., Premium Pocketing Fabric"
-            />
-          </div>
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Product description..."
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="price">Price per Meter *</Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                value={formData.price_per_meter}
-                onChange={(e) => setFormData(prev => ({ ...prev, price_per_meter: e.target.value }))}
-                placeholder="₹"
-              />
-            </div>
-            <div>
-              <Label htmlFor="min_order">Min Order (m)</Label>
-              <Input
-                id="min_order"
-                type="number"
-                value={formData.min_order_quantity}
-                onChange={(e) => setFormData(prev => ({ ...prev, min_order_quantity: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Category</Label>
-              <Select value={formData.category} onValueChange={(v) => setFormData(prev => ({ ...prev, category: v }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="economy">Economy</SelectItem>
-                  <SelectItem value="standard">Standard</SelectItem>
-                  <SelectItem value="premium">Premium</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Stock Status</Label>
-              <Select value={formData.stock_status} onValueChange={(v) => setFormData(prev => ({ ...prev, stock_status: v }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="in_stock">In Stock</SelectItem>
-                  <SelectItem value="limited">Limited</SelectItem>
-                  <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="image_url">Image URL</Label>
-            <Input
-              id="image_url"
-              value={formData.image_url}
-              onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
-              placeholder="https://example.com/image.jpg"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={onSubmit} disabled={isSaving}>
-            {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  const handleOrder = useCallback((product: Product) => {
+    setSelectedProduct(product);
+    setIsOrderModalOpen(true);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const categories = ["all", "economy", "standard", "premium"];
+  const filteredProducts =
+    selectedCategory === "all"
+      ? products
+      : products.filter((p) => p.category === selectedCategory);
 
   return (
     <div className="min-h-screen bg-muted/30">
       {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Link
                 to="/dashboard"
@@ -421,17 +451,19 @@ const ProductsPage = () => {
                 Product Catalog
               </h1>
             </div>
-            <Link to="/dashboard">
-              <Button variant="outline" size="sm">
-                Dashboard
-              </Button>
-            </Link>
-            {userRole === "admin" && (
-              <Button variant="gold" size="sm" onClick={openAddDialog}>
-                <Plus className="w-4 h-4 mr-1" />
-                Add Product
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard">
+                <Button variant="outline" size="sm">
+                  Dashboard
+                </Button>
+              </Link>
+              {userRole === "admin" && (
+                <Button variant="gold" size="sm" onClick={openAddDialog}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Product
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -467,127 +499,16 @@ const ProductsPage = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
-              <div
+              <ProductCard
                 key={product.id}
-                className="bg-card rounded-xl overflow-hidden shadow-soft hover:shadow-medium transition-all"
-              >
-                {/* Product Image */}
-                <div className="aspect-[4/3] bg-muted relative overflow-hidden">
-                  {product.image_url ? (
-                    <img
-                      src={product.image_url}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon className="w-16 h-16 text-muted-foreground/30" />
-                    </div>
-                  )}
-                  {/* Admin Edit/Delete Buttons */}
-                  {userRole === "admin" && (
-                    <div className="absolute top-2 right-2 flex gap-1">
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        className="h-8 w-8"
-                        onClick={() => openEditDialog(product)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        className="h-8 w-8"
-                        onClick={() => handleDeleteProduct(product)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-6">
-                  {/* Category Badge */}
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 capitalize ${getCategoryColor(
-                      product.category
-                    )}`}
-                  >
-                    {product.category}
-                  </span>
-
-                  {/* Product Info */}
-                  <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                    {product.name}
-                  </h3>
-                  <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                    {product.description || "Premium quality pocketing fabric"}
-                  </p>
-
-                  {/* Price */}
-                  <div className="flex items-baseline gap-1 mb-4">
-                    <IndianRupee className="w-5 h-5 text-primary" />
-                    <span className="font-display text-3xl font-bold text-primary">
-                      {Number(product.price_per_meter)}
-                    </span>
-                    <span className="text-muted-foreground text-sm">/ meter</span>
-                  </div>
-
-                  {/* Details */}
-                  <div className="space-y-2 mb-6 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Min. Order</span>
-                      <span className="font-medium text-foreground">
-                        {product.min_order_quantity} meters
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Availability</span>
-                      <span
-                        className={`font-medium ${
-                          product.stock_status === "in_stock"
-                            ? "text-green-600"
-                            : "text-amber-600"
-                        }`}
-                      >
-                        {product.stock_status === "in_stock"
-                          ? "In Stock"
-                          : "Limited"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions - Only for customers, not admin */}
-                  {userRole !== "admin" && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleRequestSample(product)}
-                      >
-                        Request Sample
-                      </Button>
-                      <Button
-                        variant="gold"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setIsOrderModalOpen(true);
-                        }}
-                      >
-                        <ShoppingCart className="w-4 h-4" />
-                        Order
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
+                product={product}
+                userRole={userRole}
+                onEdit={openEditDialog}
+                onDelete={handleDeleteProduct}
+                onRequestSample={handleRequestSample}
+                onOrder={handleOrder}
+                getCategoryColor={getCategoryColor}
+              />
             ))}
           </div>
         )}
@@ -606,12 +527,15 @@ const ProductsPage = () => {
         />
       )}
 
-      {/* Add/Edit Product Dialogs */}
+      {/* Add/Edit Product Dialogs - Now using external component */}
       <ProductFormDialog
         isOpen={isAddingProduct}
         onClose={() => setIsAddingProduct(false)}
         title="Add New Product"
         onSubmit={handleAddProduct}
+        formData={formData}
+        setFormData={setFormData}
+        isSaving={isSaving}
       />
       <ProductFormDialog
         isOpen={isEditingProduct}
@@ -621,6 +545,9 @@ const ProductsPage = () => {
         }}
         title="Edit Product"
         onSubmit={handleUpdateProduct}
+        formData={formData}
+        setFormData={setFormData}
+        isSaving={isSaving}
       />
 
       {/* AI Product Assistant Chat */}
