@@ -113,14 +113,15 @@ const CustomersPage = () => {
     if (!loading && !user) {
       navigate("/auth");
     }
-    if (!loading && user && userRole !== "admin" && userRole !== "ca") {
+    // Only admin can access customers page, not CA
+    if (!loading && user && userRole !== "admin") {
       navigate("/dashboard");
     }
   }, [user, userRole, loading, navigate]);
 
   useEffect(() => {
     const fetchCustomers = async () => {
-      if (!user || (userRole !== "admin" && userRole !== "ca")) return;
+      if (!user || userRole !== "admin") return;
 
       setIsLoading(true);
 

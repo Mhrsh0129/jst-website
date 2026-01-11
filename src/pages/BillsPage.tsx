@@ -19,6 +19,7 @@ interface Bill {
   id: string;
   bill_number: string;
   order_id: string | null;
+  customer_id: string;
   subtotal: number;
   tax_amount: number;
   total_amount: number;
@@ -43,14 +44,24 @@ const BillsPage = () => {
   const handleDownloadInvoice = async (bill: Bill) => {
     setDownloadingBillId(bill.id);
     try {
-      // Fetch customer profile
+      // Fetch customer profile using customer_id from the bill (works for admin viewing any customer's bill)
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
-        .eq("user_id", user?.id)
-        .single();
+        .eq("user_id", bill.customer_id)
+        .maybeSingle();
 
       if (profileError) throw profileError;
+      
+      // If no profile found, use default values
+      const customerProfile = profile || {
+        full_name: "Customer",
+        business_name: null,
+        email: null,
+        phone: null,
+        address: null,
+        gst_number: null,
+      };
 
       // Fetch order details if exists
       let order = null;
@@ -61,7 +72,7 @@ const BillsPage = () => {
           .from("orders")
           .select("*")
           .eq("id", bill.order_id)
-          .single();
+          .maybeSingle();
         order = orderData;
 
         if (order) {
@@ -99,12 +110,12 @@ const BillsPage = () => {
           notes: bill.notes,
         },
         {
-          full_name: profile.full_name,
-          business_name: profile.business_name,
-          email: profile.email,
-          phone: profile.phone,
-          address: profile.address,
-          gst_number: profile.gst_number,
+          full_name: customerProfile.full_name,
+          business_name: customerProfile.business_name,
+          email: customerProfile.email,
+          phone: customerProfile.phone,
+          address: customerProfile.address,
+          gst_number: customerProfile.gst_number,
         },
         order
           ? {
@@ -208,20 +219,24 @@ const BillsPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* Summary Cards */}
+        {/* Summary Cards - Hide financial totals from CA */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-card rounded-xl p-6 shadow-soft">
-            <p className="text-sm text-muted-foreground mb-1">Total Outstanding</p>
-            <p className="font-display text-2xl font-bold text-red-600">
-              ₹{bills.reduce((sum, b) => sum + Number(b.balance_due), 0).toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-card rounded-xl p-6 shadow-soft">
-            <p className="text-sm text-muted-foreground mb-1">Total Paid</p>
-            <p className="font-display text-2xl font-bold text-green-600">
-              ₹{bills.reduce((sum, b) => sum + Number(b.paid_amount), 0).toLocaleString()}
-            </p>
-          </div>
+          {userRole !== "ca" && (
+            <>
+              <div className="bg-card rounded-xl p-6 shadow-soft">
+                <p className="text-sm text-muted-foreground mb-1">Total Outstanding</p>
+                <p className="font-display text-2xl font-bold text-red-600">
+                  ₹{bills.reduce((sum, b) => sum + Number(b.balance_due), 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-card rounded-xl p-6 shadow-soft">
+                <p className="text-sm text-muted-foreground mb-1">Total Paid</p>
+                <p className="font-display text-2xl font-bold text-green-600">
+                  ₹{bills.reduce((sum, b) => sum + Number(b.paid_amount), 0).toLocaleString()}
+                </p>
+              </div>
+            </>
+          )}
           <div className="bg-card rounded-xl p-6 shadow-soft">
             <p className="text-sm text-muted-foreground mb-1">Total Bills</p>
             <p className="font-display text-2xl font-bold text-foreground">
