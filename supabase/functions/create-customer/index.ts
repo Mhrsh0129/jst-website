@@ -36,10 +36,18 @@ serve(async (req) => {
 
     const { data: { user }, error: authError } = await userClient.auth.getUser();
     
-    if (authError || !user) {
-      console.error("Auth error:", authError?.message);
+    if (authError) {
+      console.error("Auth error:", authError.message);
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Authentication failed - please log in again" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    if (!user) {
+      console.error("No user found in session");
+      return new Response(
+        JSON.stringify({ error: "Session expired - please log in again" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

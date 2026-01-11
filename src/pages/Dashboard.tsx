@@ -178,35 +178,39 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid - Hide financial totals from CA */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-card rounded-xl p-6 shadow-soft">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                <IndianRupee className="w-6 h-6 text-primary" />
+          {userRole !== "ca" && (
+            <>
+              <div className="bg-card rounded-xl p-6 shadow-soft">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <IndianRupee className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Outstanding</p>
+                    <p className="font-display text-2xl font-bold text-foreground">
+                      ₹{totalOutstanding.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Outstanding</p>
-                <p className="font-display text-2xl font-bold text-foreground">
-                  ₹{totalOutstanding.toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-card rounded-xl p-6 shadow-soft">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-green-500" />
+              <div className="bg-card rounded-xl p-6 shadow-soft">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Paid</p>
+                    <p className="font-display text-2xl font-bold text-foreground">
+                      ₹{totalPaid.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Paid</p>
-                <p className="font-display text-2xl font-bold text-foreground">
-                  ₹{totalPaid.toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </div>
+            </>
+          )}
 
           <div className="bg-card rounded-xl p-6 shadow-soft">
             <div className="flex items-center gap-4">
@@ -237,16 +241,18 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - CA only sees Bills */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Link
-            to="/products"
-            className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
-          >
-            <Package className="w-8 h-8 text-primary mx-auto mb-3 group-hover:scale-110 transition-transform" />
-            <p className="font-medium text-foreground">Products</p>
-            <p className="text-xs text-muted-foreground">Browse catalog</p>
-          </Link>
+          {userRole !== "ca" && (
+            <Link
+              to="/products"
+              className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
+            >
+              <Package className="w-8 h-8 text-primary mx-auto mb-3 group-hover:scale-110 transition-transform" />
+              <p className="font-medium text-foreground">Products</p>
+              <p className="text-xs text-muted-foreground">Browse catalog</p>
+            </Link>
+          )}
 
           <Link
             to="/bills"
@@ -257,16 +263,18 @@ const Dashboard = () => {
             <p className="text-xs text-muted-foreground">View invoices</p>
           </Link>
 
-          <Link
-            to="/payment-history"
-            className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
-          >
-            <CreditCard className="w-8 h-8 text-green-500 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-            <p className="font-medium text-foreground">Payments</p>
-            <p className="text-xs text-muted-foreground">Payment history</p>
-          </Link>
+          {userRole !== "ca" && (
+            <Link
+              to="/payment-history"
+              className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
+            >
+              <CreditCard className="w-8 h-8 text-green-500 mx-auto mb-3 group-hover:scale-110 transition-transform" />
+              <p className="font-medium text-foreground">Payments</p>
+              <p className="text-xs text-muted-foreground">Payment history</p>
+            </Link>
+          )}
 
-          {(userRole === "admin" || userRole === "ca") && (
+          {userRole === "admin" && (
             <Link
               to="/customers"
               className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all text-center group"
@@ -278,8 +286,8 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Admin Quick Actions */}
-        {(userRole === "admin" || userRole === "ca") && (
+        {/* Admin Quick Actions - Only for admin, not CA */}
+        {userRole === "admin" && (
           <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-8">
             <Link
               to="/analytics"

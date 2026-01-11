@@ -3,12 +3,33 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ArrowLeft,
   Package,
   Loader2,
   ShoppingCart,
   IndianRupee,
+  Plus,
+  Edit2,
+  Trash2,
+  ImageIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AIChatWidget from "@/components/AIChatWidget";
@@ -22,10 +43,31 @@ interface Product {
   category: string;
   min_order_quantity: number;
   stock_status: string;
+  image_url: string | null;
 }
 
+interface ProductFormData {
+  name: string;
+  description: string;
+  price_per_meter: string;
+  category: string;
+  min_order_quantity: string;
+  stock_status: string;
+  image_url: string;
+}
+
+const initialFormData: ProductFormData = {
+  name: "",
+  description: "",
+  price_per_meter: "",
+  category: "standard",
+  min_order_quantity: "1",
+  stock_status: "in_stock",
+  image_url: "",
+};
+
 const ProductsPage = () => {
-  const { user, loading } = useAuth();
+  const { user, userRole, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,6 +75,13 @@ const ProductsPage = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  
+  // Admin CRUD states
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [isEditingProduct, setIsEditingProduct] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [formData, setFormData] = useState<ProductFormData>(initialFormData);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -40,32 +89,33 @@ const ProductsPage = () => {
     }
   }, [user, loading, navigate]);
 
+  const fetchProducts = async () => {
+    // Admin can see all products (including inactive), others only active
+    const query = userRole === "admin"
+      ? supabase.from("products").select("*").order("price_per_meter", { ascending: true })
+      : supabase.from("products").select("*").eq("is_active", true).order("price_per_meter", { ascending: true });
+    
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Error fetching products:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load products. Please try again.",
+        variant: "destructive",
+      });
+    } else {
+      setProducts(data || []);
+    }
+
+    setIsLoadingProducts(false);
+  };
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true)
-        .order("price_per_meter", { ascending: true });
-
-      if (error) {
-        console.error("Error fetching products:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load products. Please try again.",
-          variant: "destructive",
-        });
-      } else {
-        setProducts(data || []);
-      }
-
-      setIsLoadingProducts(false);
-    };
-
     if (user) {
       fetchProducts();
     }
-  }, [user, toast]);
+  }, [user, userRole, toast]);
 
   if (loading) {
     return (
@@ -122,6 +172,238 @@ const ProductsPage = () => {
     }
   };
 
+  // Admin functions
+  const openAddDialog = () => {
+    setFormData(initialFormData);
+    setIsAddingProduct(true);
+  };
+
+  const openEditDialog = (product: Product) => {
+    setEditingProduct(product);
+    setFormData({
+      name: product.name,
+      description: product.description || "",
+      price_per_meter: product.price_per_meter.toString(),
+      category: product.category,
+      min_order_quantity: product.min_order_quantity.toString(),
+      stock_status: product.stock_status,
+      image_url: product.image_url || "",
+    });
+    setIsEditingProduct(true);
+  };
+
+  const handleAddProduct = async () => {
+    if (!formData.name.trim() || !formData.price_per_meter) {
+      toast({
+        title: "Validation Error",
+        description: "Product name and price are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { data, error } = await supabase.from("products").insert({
+        name: formData.name.trim(),
+        description: formData.description.trim() || null,
+        price_per_meter: parseFloat(formData.price_per_meter),
+        category: formData.category,
+        min_order_quantity: parseInt(formData.min_order_quantity) || 1,
+        stock_status: formData.stock_status,
+        image_url: formData.image_url.trim() || null,
+        is_active: true,
+      }).select().single();
+
+      if (error) throw error;
+
+      setProducts(prev => [...prev, data]);
+      toast({ title: "Product added", description: `${formData.name} has been added.` });
+      setIsAddingProduct(false);
+      setFormData(initialFormData);
+    } catch (error: any) {
+      console.error("Error adding product:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add product.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!editingProduct || !formData.name.trim() || !formData.price_per_meter) {
+      toast({
+        title: "Validation Error",
+        description: "Product name and price are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase.from("products").update({
+        name: formData.name.trim(),
+        description: formData.description.trim() || null,
+        price_per_meter: parseFloat(formData.price_per_meter),
+        category: formData.category,
+        min_order_quantity: parseInt(formData.min_order_quantity) || 1,
+        stock_status: formData.stock_status,
+        image_url: formData.image_url.trim() || null,
+      }).eq("id", editingProduct.id);
+
+      if (error) throw error;
+
+      setProducts(prev =>
+        prev.map(p =>
+          p.id === editingProduct.id
+            ? {
+                ...p,
+                name: formData.name.trim(),
+                description: formData.description.trim() || null,
+                price_per_meter: parseFloat(formData.price_per_meter),
+                category: formData.category,
+                min_order_quantity: parseInt(formData.min_order_quantity) || 1,
+                stock_status: formData.stock_status,
+                image_url: formData.image_url.trim() || null,
+              }
+            : p
+        )
+      );
+      toast({ title: "Product updated", description: `${formData.name} has been updated.` });
+      setIsEditingProduct(false);
+      setEditingProduct(null);
+      setFormData(initialFormData);
+    } catch (error: any) {
+      console.error("Error updating product:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update product.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return;
+
+    try {
+      const { error } = await supabase.from("products").delete().eq("id", product.id);
+      if (error) throw error;
+
+      setProducts(prev => prev.filter(p => p.id !== product.id));
+      toast({ title: "Product deleted", description: `${product.name} has been removed.` });
+    } catch (error: any) {
+      console.error("Error deleting product:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete product.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const ProductFormDialog = ({ isOpen, onClose, title, onSubmit }: { isOpen: boolean; onClose: () => void; title: string; onSubmit: () => void }) => (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <Label htmlFor="name">Product Name *</Label>
+            <Input
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="e.g., Premium Pocketing Fabric"
+            />
+          </div>
+          <div>
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Product description..."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="price">Price per Meter *</Label>
+              <Input
+                id="price"
+                type="number"
+                step="0.01"
+                value={formData.price_per_meter}
+                onChange={(e) => setFormData(prev => ({ ...prev, price_per_meter: e.target.value }))}
+                placeholder="₹"
+              />
+            </div>
+            <div>
+              <Label htmlFor="min_order">Min Order (m)</Label>
+              <Input
+                id="min_order"
+                type="number"
+                value={formData.min_order_quantity}
+                onChange={(e) => setFormData(prev => ({ ...prev, min_order_quantity: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Category</Label>
+              <Select value={formData.category} onValueChange={(v) => setFormData(prev => ({ ...prev, category: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="economy">Economy</SelectItem>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="premium">Premium</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Stock Status</Label>
+              <Select value={formData.stock_status} onValueChange={(v) => setFormData(prev => ({ ...prev, stock_status: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="in_stock">In Stock</SelectItem>
+                  <SelectItem value="limited">Limited</SelectItem>
+                  <SelectItem value="out_of_stock">Out of Stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="image_url">Image URL</Label>
+            <Input
+              id="image_url"
+              value={formData.image_url}
+              onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
+              placeholder="https://example.com/image.jpg"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={onSubmit} disabled={isSaving}>
+            {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   return (
     <div className="min-h-screen bg-muted/30">
       {/* Header */}
@@ -144,6 +426,12 @@ const ProductsPage = () => {
                 Dashboard
               </Button>
             </Link>
+            {userRole === "admin" && (
+              <Button variant="gold" size="sm" onClick={openAddDialog}>
+                <Plus className="w-4 h-4 mr-1" />
+                Add Product
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -181,80 +469,123 @@ const ProductsPage = () => {
             {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="bg-card rounded-xl p-6 shadow-soft hover:shadow-medium transition-all"
+                className="bg-card rounded-xl overflow-hidden shadow-soft hover:shadow-medium transition-all"
               >
-                {/* Category Badge */}
-                <span
-                  className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 capitalize ${getCategoryColor(
-                    product.category
-                  )}`}
-                >
-                  {product.category}
-                </span>
+                {/* Product Image */}
+                <div className="aspect-[4/3] bg-muted relative overflow-hidden">
+                  {product.image_url ? (
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <ImageIcon className="w-16 h-16 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  {/* Admin Edit/Delete Buttons */}
+                  {userRole === "admin" && (
+                    <div className="absolute top-2 right-2 flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8"
+                        onClick={() => openEditDialog(product)}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="h-8 w-8"
+                        onClick={() => handleDeleteProduct(product)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
 
-                {/* Product Info */}
-                <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                  {product.name}
-                </h3>
-                <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-                  {product.description || "Premium quality pocketing fabric"}
-                </p>
-
-                {/* Price */}
-                <div className="flex items-baseline gap-1 mb-4">
-                  <IndianRupee className="w-5 h-5 text-primary" />
-                  <span className="font-display text-3xl font-bold text-primary">
-                    {Number(product.price_per_meter)}
+                <div className="p-6">
+                  {/* Category Badge */}
+                  <span
+                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 capitalize ${getCategoryColor(
+                      product.category
+                    )}`}
+                  >
+                    {product.category}
                   </span>
-                  <span className="text-muted-foreground text-sm">/ meter</span>
-                </div>
 
-                {/* Details */}
-                <div className="space-y-2 mb-6 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Min. Order</span>
-                    <span className="font-medium text-foreground">
-                      {product.min_order_quantity} meters
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Availability</span>
-                    <span
-                      className={`font-medium ${
-                        product.stock_status === "in_stock"
-                          ? "text-green-600"
-                          : "text-amber-600"
-                      }`}
-                    >
-                      {product.stock_status === "in_stock"
-                        ? "In Stock"
-                        : "Limited"}
-                    </span>
-                  </div>
-                </div>
+                  {/* Product Info */}
+                  <h3 className="font-display text-lg font-semibold text-foreground mb-2">
+                    {product.name}
+                  </h3>
+                  <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
+                    {product.description || "Premium quality pocketing fabric"}
+                  </p>
 
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleRequestSample(product)}
-                  >
-                    Request Sample
-                  </Button>
-                  <Button
-                    variant="gold"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setIsOrderModalOpen(true);
-                    }}
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    Order
-                  </Button>
+                  {/* Price */}
+                  <div className="flex items-baseline gap-1 mb-4">
+                    <IndianRupee className="w-5 h-5 text-primary" />
+                    <span className="font-display text-3xl font-bold text-primary">
+                      {Number(product.price_per_meter)}
+                    </span>
+                    <span className="text-muted-foreground text-sm">/ meter</span>
+                  </div>
+
+                  {/* Details */}
+                  <div className="space-y-2 mb-6 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Min. Order</span>
+                      <span className="font-medium text-foreground">
+                        {product.min_order_quantity} meters
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Availability</span>
+                      <span
+                        className={`font-medium ${
+                          product.stock_status === "in_stock"
+                            ? "text-green-600"
+                            : "text-amber-600"
+                        }`}
+                      >
+                        {product.stock_status === "in_stock"
+                          ? "In Stock"
+                          : "Limited"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions - Only for customers, not admin */}
+                  {userRole !== "admin" && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleRequestSample(product)}
+                      >
+                        Request Sample
+                      </Button>
+                      <Button
+                        variant="gold"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          setSelectedProduct(product);
+                          setIsOrderModalOpen(true);
+                        }}
+                      >
+                        <ShoppingCart className="w-4 h-4" />
+                        Order
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -274,6 +605,23 @@ const ProductsPage = () => {
           userId={user.id}
         />
       )}
+
+      {/* Add/Edit Product Dialogs */}
+      <ProductFormDialog
+        isOpen={isAddingProduct}
+        onClose={() => setIsAddingProduct(false)}
+        title="Add New Product"
+        onSubmit={handleAddProduct}
+      />
+      <ProductFormDialog
+        isOpen={isEditingProduct}
+        onClose={() => {
+          setIsEditingProduct(false);
+          setEditingProduct(null);
+        }}
+        title="Edit Product"
+        onSubmit={handleUpdateProduct}
+      />
 
       {/* AI Product Assistant Chat */}
       <AIChatWidget type="product" title="Product Assistant" />
