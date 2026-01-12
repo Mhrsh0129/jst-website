@@ -88,7 +88,18 @@ WHERE customer_id IN (
 -- Delete sample requests
 DELETE FROM public.sample_requests 
 WHERE customer_id IN (
-  SELECT3: Delete customer profiles (ONLY customers, not admin/CA)
+  SELECT user_id FROM public.user_roles 
+  WHERE role = 'customer'
+);
+
+-- Step 2: Delete ALL products, coupons, and inventory
+DELETE FROM public.coupons;
+
+DELETE FROM public.stock_history;
+
+DELETE FROM public.products;
+
+-- Step 3: Delete customer profiles (ONLY customers, not admin/CA)
 DELETE FROM public.profiles 
 WHERE user_id IN (
   SELECT user_id FROM public.user_roles 
@@ -102,18 +113,6 @@ WHERE role = 'customer'
 AND user_id NOT IN (SELECT user_id FROM protected_users);
 
 -- Step 5: Delete customer auth users (ONLY customers, not admin/CA)
--- This removes customer accounts from Supabase Auth
-DELETE FROM auth.users 
-WHERE id IN (
-  SELECT user_id FROM public.user_roles 
-  WHERE role = 'customer'
-)
-AND id NOT IN (SELECT user_id FROM protected_users);
-
--- Step 6: Final verification
-
--- Step 4: Delete customer auth users (ONLY customers, not admin/CA)
--- This removes customer accounts from Supabase Auth
 DELETE FROM auth.users 
 WHERE id IN (
   SELECT user_id FROM public.user_roles 
@@ -133,8 +132,7 @@ DECLARE
   bills_count INT;
   orders_count INT;
   payments_count INT;
-  stock_history_count INT;
-  coupons_count INT;
+  stock_6: Final verification
 BEGIN
   SELECT COUNT(*) INTO admin_count FROM public.user_roles WHERE role = 'admin';
   SELECT COUNT(*) INTO ca_count FROM public.user_roles WHERE role = 'ca';
