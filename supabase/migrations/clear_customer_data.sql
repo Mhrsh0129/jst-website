@@ -20,112 +20,89 @@
 
 BEGIN;
 
+-- IMPORTANT: First, protect admin and CA users by getting their IDs
+-- We'll use these to ensure they're never deleted
+
+-- Step 0: Identify admin and CA users to PROTECT
+-- Save their user IDs in a temporary variable
+CREATE TEMPORARY TABLE protected_users AS
+SELECT DISTINCT p.user_id 
+FROM public.profiles p
+INNER JOIN public.user_roles ur ON p.user_id = ur.user_id
+WHERE ur.role IN ('admin', 'ca');
+
 -- Step 1: Delete all data from customer-related tables
+-- Using a subquery to get ONLY customer user_ids
 -- (These will cascade delete due to foreign key constraints)
 
--- Delete payment requests (if table exists)
 DELETE FROM public.payment_requests 
 WHERE customer_id IN (
-  SELECT user_id FROM public.profiles 
-  WHERE id IN (
-    SELECT id FROM public.profiles p
-    LEFT JOIN public.user_roles ur ON p.user_id = ur.user_id
-    WHERE ur.role = 'customer' OR ur.role IS NULL
-  )
+  SELECT user_id FROM public.user_roles 
+  WHERE role = 'customer'
 );
 
--- Delete payment reminders
 DELETE FROM public.payment_reminders 
 WHERE customer_id IN (
-  SELECT user_id FROM public.profiles 
-  WHERE id IN (
-    SELECT id FROM public.profiles p
-    LEFT JOIN public.user_roles ur ON p.user_id = ur.user_id
-    WHERE ur.role = 'customer' OR ur.role IS NULL
-  )
+  SELECT user_id FROM public.user_roles 
+  WHERE role = 'customer'
 );
 
--- Delete payments (will also remove child records)
 DELETE FROM public.payments 
 WHERE customer_id IN (
-  SELECT user_id FROM public.profiles 
-  WHERE id IN (
-    SELECT id FROM public.profiles p
-    LEFT JOIN public.user_roles ur ON p.user_id = ur.user_id
-    WHERE ur.role = 'customer' OR ur.role IS NULL
-  )
+  SELECT user_id FROM public.user_roles 
+  WHERE role = 'customer'
 );
 
--- Delete bills (will cascade to payments if any remain)
 DELETE FROM public.bills 
 WHERE customer_id IN (
-  SELECT user_id FROM public.profiles 
-  WHERE id IN (
-    SELECT id FROM public.profiles p
-    LEFT JOIN public.user_roles ur ON p.user_id = ur.user_id
-    WHERE ur.role = 'customer' OR ur.role IS NULL
-  )
+  SELECT user_id FROM public.user_roles 
+  WHERE role = 'customer'
 );
 
--- Delete order items (must delete before orders)
 DELETE FROM public.order_items 
 WHERE order_id IN (
   SELECT id FROM public.orders 
   WHERE customer_id IN (
-    SELECT user_id FROM public.profiles 
-    WHERE id IN (
-      SELECT id FROM public.profiles p
-      LEFT JOIN public.user_roles ur ON p.user_id = ur.user_id
-      WHERE ur.role = 'customer' OR ur.role IS NULL
-    )
+    SELECT user_id FROM public.user_roles 
+    WHERE role = 'customer'
   )
 );
 
--- Delete orders
 DELETE FROM public.orders 
 WHERE customer_id IN (
-  SELECT user_id FROM public.profiles 
-  WHERE id IN (
-    SELECT id FROM public.profiles p
-    LEFT JOIN public.user_roles ur ON p.user_id = ur.user_id
-    WHERE ur.role = 'customer' OR ur.role IS NULL
-  )
+  SELECT user_id FROM public.user_roles 
+  WHERE role = 'customer'
 );
 
--- Delete sample requests
 DELETE FROM public.sample_requests 
 WHERE customer_id IN (
-  SELECT user_id FROM public.profiles 
-  WHERE id IN (
-    SELECT id FROM public.profiles p
-    LEFT JOIN public.user_roles ur ON p.user_id = ur.user_id
-    WHERE ur.role = 'customer' OR ur.role IS NULL
-  )
+  SELECT user_id FROM public.user_roles 
+  WHERE role = 'customer'
 );
 
--- Delete stock history (if table exists)
--- This allows the new organization to add their own stock data
 DELETE FROM public.stock_history;
 
--- Step 2: Delete customer profiles (but keep admin and CA)
+-- Step 2: Delete customer profiles (ONLY customers, not admin/CA)
 DELETE FROM public.profiles 
 WHERE user_id IN (
-  SELECT p.user_id FROM public.profiles p
-  LEFT JOIN public.user_roles ur ON p.user_id = ur.user_id
-  WHERE ur.role = 'customer' OR ur.role IS NULL
-);
+  SELECT user_id FROM public.user_roles 
+  WHERE role = 'customer'
+)
+AND user_id NOT IN (SELECT user_id FROM protected_users);
 
 -- Step 3: Delete customer user_roles entries
 DELETE FROM public.user_roles 
-WHERE role = 'customer';
+WHERE role = 'customer'
+AND user_id NOT IN (SELECT user_id FROM protected_users);
 
--- Step 4: Delete customer auth users (this will cascade delete anything remaining)
--- Note: This removes the actual user accounts from Supabase Auth
+-- Step 4: Delete customer auth users (ONLY customers, not admin/CA)
+-- This removes customer accounts from Supabase Auth
 DELETE FROM auth.users 
-WHERE id NOT IN (
+WHERE id IN (
   SELECT user_id FROM public.user_roles 
-  WHERE role IN ('admin', 'ca')
-);
+  WHERE role = 'customer'
+)
+AND id NOT IN (SELECT user_id FROM protected_users);
 
 -- Step 5: Verify what's left
 -- This will show you the remaining accounts (should only be admin and CA)
@@ -134,6 +111,7 @@ DECLARE
   admin_count INT;
   ca_count INT;
   customer_count INT;
+  total_remaining INT;
   products_count INT;
   bills_count INT;
   orders_count INT;
@@ -143,6 +121,7 @@ BEGIN
   SELECT COUNT(*) INTO admin_count FROM public.user_roles WHERE role = 'admin';
   SELECT COUNT(*) INTO ca_count FROM public.user_roles WHERE role = 'ca';
   SELECT COUNT(*) INTO customer_count FROM public.user_roles WHERE role = 'customer';
+  SELECT COUNT(*) INTO total_remaining FROM public.profiles;
   SELECT COUNT(*) INTO products_count FROM public.products;
   SELECT COUNT(*) INTO bills_count FROM public.bills;
   SELECT COUNT(*) INTO orders_count FROM public.orders;
@@ -153,11 +132,16 @@ BEGIN
   RAISE NOTICE 'Remaining Admin accounts: %', admin_count;
   RAISE NOTICE 'Remaining CA accounts: %', ca_count;
   RAISE NOTICE 'Remaining Customer accounts: % (should be 0)', customer_count;
+  RAISE NOTICE 'Total remaining profiles: %', total_remaining;
   RAISE NOTICE 'Products in catalog: %', products_count;
   RAISE NOTICE 'Stock history entries: % (should be 0)', stock_history_count;
   RAISE NOTICE 'Bills remaining: % (should be 0)', bills_count;
   RAISE NOTICE 'Orders remaining: % (should be 0)', orders_count;
   RAISE NOTICE 'Payments remaining: % (should be 0)', payments_count;
+  
+  IF admin_count = 0 THEN
+    RAISE WARNING 'WARNING: No admin accounts found! At least 1 admin should remain.';
+  END IF;
   
   IF customer_count > 0 THEN
     RAISE WARNING 'WARNING: % customer accounts still exist!', customer_count;
@@ -171,8 +155,8 @@ END $$;
 COMMIT;
 
 -- After running this script, you should see:
--- ✅ Admin accounts: 1 or more
--- ✅ CA accounts: 0 or more
+-- ✅ Admin accounts: 1 or more (PROTECTED)
+-- ✅ CA accounts: 1 or more (PROTECTED)
 -- ✅ Customer accounts: 0
 -- ✅ Products: Your existing product catalog
 -- ✅ Bills, Orders, Payments: All should be 0
