@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Copy, Check, QrCode, Smartphone, Building2, Loader2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -48,13 +48,7 @@ const CustomerBulkPaymentModal = ({
   const upiId = "8319621211@ybl";
   const payeeName = "Jay Shree Traders";
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchBills();
-    }
-  }, [isOpen]);
-
-  const fetchBills = async () => {
+  const fetchBills = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -75,7 +69,13 @@ const CustomerBulkPaymentModal = ({
       });
     }
     setIsLoading(false);
-  };
+  }, [customerId, toast]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchBills();
+    }
+  }, [isOpen, fetchBills]);
 
   const computeAllocations = (paymentAmount: number) => {
     const result: AllocationItem[] = [];
@@ -146,11 +146,12 @@ const CustomerBulkPaymentModal = ({
       // Don't close yet - let customer see payment details
       setAmount("");
       setAllocations([]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating payment request:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create payment request";
       toast({
         title: "Error",
-        description: error.message || "Failed to create payment request",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -168,10 +169,10 @@ const CustomerBulkPaymentModal = ({
   const upiLink =
     paymentAmount > 0
       ? `upi://pay?pa=${upiId}&pn=${encodeURIComponent(
-          payeeName
-        )}&am=${paymentAmount}&cu=INR&tn=${encodeURIComponent(
-          "Bulk payment via app"
-        )}`
+        payeeName
+      )}&am=${paymentAmount}&cu=INR&tn=${encodeURIComponent(
+        "Bulk payment via app"
+      )}`
       : "";
 
   const copyToClipboard = (text: string, label: string) => {

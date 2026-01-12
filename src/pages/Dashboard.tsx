@@ -66,12 +66,21 @@ const Dashboard = () => {
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
-    if (!loading && !user) {
+    // Don't do anything while auth is still loading
+    if (loading) return;
+
+    // Redirect to auth if not logged in
+    if (!user) {
       navigate("/auth");
+      return;
     }
-    // CA can only view bills, redirect them to bills page
-    if (!loading && user && userRole === "ca") {
+
+    // Only redirect CA users to bills page (admin and customers stay on dashboard)
+    if (userRole === "ca") {
+      console.log("CA user detected, redirecting to bills page");
       navigate("/bills");
+    } else {
+      console.log("User role:", userRole, "- staying on dashboard");
     }
   }, [user, loading, navigate, userRole]);
 
@@ -108,7 +117,7 @@ const Dashboard = () => {
 
         if (billsData) {
           let enrichedBills = billsData;
-          
+
           // For admins, fetch customer names
           if (userRole === "admin" && billsData.length > 0) {
             const customerIds = [...new Set(billsData.map(b => b.customer_id))];
@@ -116,14 +125,14 @@ const Dashboard = () => {
               .from("profiles")
               .select("user_id, full_name")
               .in("user_id", customerIds);
-            
+
             const profilesMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
             enrichedBills = billsData.map(b => ({
               ...b,
               customer_name: profilesMap.get(b.customer_id) || "Unknown"
             }));
           }
-          
+
           setBills(enrichedBills);
         }
 
@@ -142,7 +151,7 @@ const Dashboard = () => {
 
         if (ordersData) {
           let enrichedOrders = ordersData;
-          
+
           // For admins, fetch customer names
           if (userRole === "admin" && ordersData.length > 0) {
             const customerIds = [...new Set(ordersData.map(o => o.customer_id))];
@@ -150,14 +159,14 @@ const Dashboard = () => {
               .from("profiles")
               .select("user_id, full_name")
               .in("user_id", customerIds);
-            
+
             const profilesMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
             enrichedOrders = ordersData.map(o => ({
               ...o,
               customer_name: profilesMap.get(o.customer_id) || "Unknown"
             }));
           }
-          
+
           setOrders(enrichedOrders);
         }
 
@@ -253,7 +262,7 @@ const Dashboard = () => {
             </Link>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground hidden sm:inline">
-                Welcome, {profile?.full_name || "User"}
+                Welcome, {profile?.full_name || (userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "User")}
               </span>
               {userRole && (
                 <span className="text-xs bg-accent/20 text-accent-foreground px-2 py-1 rounded-full capitalize">
@@ -273,7 +282,7 @@ const Dashboard = () => {
         {/* Welcome Card */}
         <div className="bg-gradient-hero text-primary-foreground rounded-2xl p-6 md:p-8 mb-8">
           <h1 className="font-display text-2xl md:text-3xl font-bold mb-2">
-            Welcome, {profile?.full_name || "User"}!
+            Welcome, {profile?.full_name || (userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : "User")}!
           </h1>
           <p className="text-primary-foreground/80 mb-4">
             {profile?.business_name && `Business: ${profile.business_name}`}
@@ -329,19 +338,19 @@ const Dashboard = () => {
           )}
 
           {userRole !== "ca" && (
-          <div className="bg-card rounded-xl p-6 shadow-soft">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center">
-                <ShoppingCart className="w-6 h-6 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Orders</p>
-                <p className="font-display text-2xl font-bold text-foreground">
-                  {orders.length}
-                </p>
+            <div className="bg-card rounded-xl p-6 shadow-soft">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center">
+                  <ShoppingCart className="w-6 h-6 text-accent" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Orders</p>
+                  <p className="font-display text-2xl font-bold text-foreground">
+                    {orders.length}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
           )}
 
           <div className="bg-card rounded-xl p-6 shadow-soft">
@@ -460,7 +469,7 @@ const Dashboard = () => {
                 View all
               </Link>
             </div>
-            
+
             {isLoadingData ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -494,13 +503,12 @@ const Dashboard = () => {
                         ₹{Number(bill.total_amount).toLocaleString()}
                       </p>
                       <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          bill.status === "paid"
-                            ? "bg-green-500/20 text-green-600"
-                            : bill.status === "partial"
+                        className={`text-xs px-2 py-0.5 rounded-full ${bill.status === "paid"
+                          ? "bg-green-500/20 text-green-600"
+                          : bill.status === "partial"
                             ? "bg-amber-500/20 text-amber-600"
                             : "bg-red-500/20 text-red-600"
-                        }`}
+                          }`}
                       >
                         {bill.status}
                       </span>
@@ -522,7 +530,7 @@ const Dashboard = () => {
                   View all
                 </Link>
               </div>
-              
+
               {isLoadingData ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -556,13 +564,12 @@ const Dashboard = () => {
                           ₹{Number(order.total_amount).toLocaleString()}
                         </p>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            order.status === "completed"
-                              ? "bg-green-500/20 text-green-600"
-                              : order.status === "processing"
+                          className={`text-xs px-2 py-0.5 rounded-full ${order.status === "completed"
+                            ? "bg-green-500/20 text-green-600"
+                            : order.status === "processing"
                               ? "bg-blue-500/20 text-blue-600"
                               : "bg-amber-500/20 text-amber-600"
-                          }`}
+                            }`}
                         >
                           {order.status}
                         </span>
@@ -610,13 +617,12 @@ const Dashboard = () => {
                       </p>
                     </div>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        sr.status === "pending"
-                          ? "bg-amber-500/20 text-amber-600"
-                          : sr.status === "approved"
+                      className={`text-xs px-2 py-0.5 rounded-full ${sr.status === "pending"
+                        ? "bg-amber-500/20 text-amber-600"
+                        : sr.status === "approved"
                           ? "bg-green-500/20 text-green-600"
                           : "bg-blue-500/20 text-blue-600"
-                      }`}
+                        }`}
                     >
                       {sr.status}
                     </span>

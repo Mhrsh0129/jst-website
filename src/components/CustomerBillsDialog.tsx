@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,7 +80,7 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [billPayments, setBillPayments] = useState<Payment[]>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(false);
-  
+
   // Payment form state
   const [isPaymentMode, setIsPaymentMode] = useState(false);
   const [isBulkPaymentMode, setIsBulkPaymentMode] = useState(false);
@@ -92,13 +92,7 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
   const [paymentNotes, setPaymentNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && customerUserId) {
-      fetchBills();
-    }
-  }, [isOpen, customerUserId]);
-
-  const fetchBills = async () => {
+  const fetchBills = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -113,7 +107,13 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
       console.error("Error fetching bills:", error);
     }
     setIsLoading(false);
-  };
+  }, [customerUserId]);
+
+  useEffect(() => {
+    if (isOpen && customerUserId) {
+      fetchBills();
+    }
+  }, [isOpen, customerUserId, fetchBills]);
 
   const fetchBillPayments = async (billId: string) => {
     setIsLoadingPayments(true);
@@ -156,12 +156,12 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
   // Calculate interest for overdue bills (100 days interest-free, 1% per week after)
   const calculateInterest = (bill: Bill) => {
     if (bill.status === "paid" || bill.balance_due <= 0) return null;
-    
+
     const billDate = new Date(bill.created_at);
     const now = new Date();
     const daysDiff = Math.floor((now.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
     const daysOver = daysDiff - 100;
-    
+
     if (daysOver <= 0) {
       return {
         isOverdue: false,
@@ -170,11 +170,11 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
         weeksOver: 0
       };
     }
-    
+
     const weeksOver = Math.ceil(daysOver / 7);
     const interestRate = weeksOver * 0.01;
     const interest = bill.balance_due * interestRate;
-    
+
     return {
       isOverdue: true,
       daysOver,
@@ -187,7 +187,7 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
   // Single bill payment
   const handleRecordPayment = async () => {
     if (!selectedBill) return;
-    
+
     const amount = parseFloat(paymentAmount);
     if (!amount || amount <= 0) {
       toast({
@@ -239,11 +239,12 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
       setSelectedBill({ ...selectedBill, paid_amount: newPaid, balance_due: newBalance, status: newStatus });
       fetchBillPayments(selectedBill.id);
       fetchBills();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error recording payment:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to record payment.";
       toast({
         title: "Error",
-        description: error.message || "Failed to record payment.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -282,7 +283,7 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
         if (remainingAmount <= 0) break;
 
         const amountToApply = Math.min(remainingAmount, Number(bill.balance_due));
-        
+
         // Insert payment
         const { error: paymentError } = await supabase.from("payments").insert({
           bill_id: bill.id,
@@ -324,11 +325,12 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
       resetPaymentForm();
       setIsBulkPaymentMode(false);
       fetchBills();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error recording bulk payment:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to record bulk payment.";
       toast({
         title: "Error",
-        description: error.message || "Failed to record bulk payment.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -354,8 +356,8 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
   };
 
   const toggleBillSelection = (billId: string) => {
-    setSelectedBillsForPayment(prev => 
-      prev.includes(billId) 
+    setSelectedBillsForPayment(prev =>
+      prev.includes(billId)
         ? prev.filter(id => id !== billId)
         : [...prev, billId]
     );
@@ -404,7 +406,7 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
             <DialogDescription>
               Select bills to apply payment (oldest bills will be paid first)
             </DialogDescription>
-            
+
             {/* Bill Selection */}
             <div className="border rounded-lg max-h-48 overflow-y-auto">
               {unpaidBills.map((bill) => (
@@ -605,7 +607,7 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
               {(() => {
                 const interestInfo = calculateInterest(selectedBill);
                 if (!interestInfo) return null;
-                
+
                 return (
                   <div className={`p-4 rounded-lg border ${interestInfo.isOverdue ? 'bg-red-50 dark:bg-red-950/20 border-red-200' : 'bg-green-50 dark:bg-green-950/20 border-green-200'}`}>
                     {interestInfo.isOverdue ? (
@@ -737,7 +739,7 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
                 </Button>
               </div>
             )}
-            
+
             {bills.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -760,8 +762,8 @@ const CustomerBillsDialog = ({ isOpen, onClose, customerUserId, customerName }: 
                   {bills.map((bill) => {
                     const interestInfo = calculateInterest(bill);
                     return (
-                      <TableRow 
-                        key={bill.id} 
+                      <TableRow
+                        key={bill.id}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => handleBillClick(bill)}
                       >

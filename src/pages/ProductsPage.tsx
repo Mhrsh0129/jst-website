@@ -53,12 +53,12 @@ const initialFormData: ProductFormData = {
 };
 
 // Memoized product card for better performance
-const ProductCard = memo(({ 
-  product, 
-  userRole, 
-  onEdit, 
-  onDelete, 
-  onRequestSample, 
+const ProductCard = memo(({
+  product,
+  userRole,
+  onEdit,
+  onDelete,
+  onRequestSample,
   onOrder,
   getCategoryColor
 }: {
@@ -168,19 +168,18 @@ const ProductCard = memo(({
         <div className="flex justify-between">
           <span className="text-muted-foreground">Availability</span>
           <span
-            className={`font-medium ${
-              product.stock_status === "in_stock"
-                ? "text-green-600"
-                : product.stock_status === "out_of_stock"
+            className={`font-medium ${product.stock_status === "in_stock"
+              ? "text-green-600"
+              : product.stock_status === "out_of_stock"
                 ? "text-red-600"
                 : "text-amber-600"
-            }`}
+              }`}
           >
             {product.stock_status === "in_stock"
               ? "In Stock"
               : product.stock_status === "out_of_stock"
-              ? "Out of Stock"
-              : "Limited"}
+                ? "Out of Stock"
+                : "Limited"}
           </span>
         </div>
       </div>
@@ -223,7 +222,7 @@ const ProductsPage = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  
+
   // Admin CRUD states
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isEditingProduct, setIsEditingProduct] = useState(false);
@@ -244,12 +243,12 @@ const ProductsPage = () => {
 
   const fetchProducts = useCallback(async () => {
     if (!user) return;
-    
+
     // Admin can see all products (including inactive), others only active
     const query = userRole === "admin"
       ? supabase.from("products").select("*").order("price_per_meter", { ascending: true })
       : supabase.from("products").select("*").eq("is_active", true).order("price_per_meter", { ascending: true });
-    
+
     const { data, error } = await query;
 
     if (error) {
@@ -377,11 +376,13 @@ const ProductsPage = () => {
       toast({ title: "Product added", description: `${formData.name} has been added.` });
       setIsAddingProduct(false);
       setFormData(initialFormData);
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       console.error("Error adding product:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to add product.";
       toast({
         title: "Error",
-        description: error.message || "Failed to add product.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -420,18 +421,18 @@ const ProductsPage = () => {
         prev.map(p =>
           p.id === editingProduct.id
             ? {
-                ...p,
-                name: formData.name.trim(),
-                description: formData.description.trim() || null,
-                price_per_meter: parseFloat(formData.price_per_meter),
-                category: formData.category,
-                min_order_quantity: parseInt(formData.min_order_quantity) || 1,
-                stock_status: formData.stock_status,
-                stock_quantity: parseInt(formData.stock_quantity) || 0,
-                minimum_stock_level: parseInt(formData.minimum_stock_level) || 0,
-                reorder_point: parseInt(formData.reorder_point) || 0,
-                image_url: formData.image_url.trim() || null,
-              }
+              ...p,
+              name: formData.name.trim(),
+              description: formData.description.trim() || null,
+              price_per_meter: parseFloat(formData.price_per_meter),
+              category: formData.category,
+              min_order_quantity: parseInt(formData.min_order_quantity) || 1,
+              stock_status: formData.stock_status,
+              stock_quantity: parseInt(formData.stock_quantity) || 0,
+              minimum_stock_level: parseInt(formData.minimum_stock_level) || 0,
+              reorder_point: parseInt(formData.reorder_point) || 0,
+              image_url: formData.image_url.trim() || null,
+            }
             : p
         )
       );
@@ -439,11 +440,13 @@ const ProductsPage = () => {
       setIsEditingProduct(false);
       setEditingProduct(null);
       setFormData(initialFormData);
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       console.error("Error updating product:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to update product.";
       toast({
         title: "Error",
-        description: error.message || "Failed to update product.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -461,7 +464,7 @@ const ProductsPage = () => {
         .from("products")
         .delete()
         .eq("id", product.id);
-      
+
       if (error) {
         console.error("Delete error:", error);
         throw error;
@@ -469,11 +472,13 @@ const ProductsPage = () => {
 
       setProducts(prev => prev.filter(p => p.id !== product.id));
       toast({ title: "Product deleted", description: `${product.name} has been removed.` });
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       console.error("Error deleting product:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete product. Make sure you have admin permissions.";
       toast({
         title: "Error",
-        description: error.message || "Failed to delete product. Make sure you have admin permissions.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -504,7 +509,7 @@ const ProductsPage = () => {
     const matchesCategory = selectedCategory === "all" ? true : p.category === selectedCategory;
     const matchesSearch = searchTerm
       ? p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.description || "").toLowerCase().includes(searchTerm.toLowerCase())
+      (p.description || "").toLowerCase().includes(searchTerm.toLowerCase())
       : true;
     return matchesCategory && matchesSearch;
   });
@@ -534,9 +539,9 @@ const ProductsPage = () => {
               </Link>
               {userRole === "admin" && (
                 <>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setIsCouponDialogOpen(true)}
                   >
                     <Tag className="w-4 h-4 mr-1" />
@@ -585,11 +590,10 @@ const ProductsPage = () => {
             <button
               key={category}
               onClick={() => setSelectedCategory(category)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${
-                selectedCategory === category
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-muted"
-              }`}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all capitalize ${selectedCategory === category
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:bg-muted"
+                }`}
             >
               {category === "all" ? "All Products" : category}
             </button>

@@ -1,289 +1,222 @@
-# Jay Shree Traders Hub
+# Jay Shree Traders - Wholesale Management System
 
-A comprehensive business management system for managing customers, products, bills, orders, and payments with role-based access control (Admin, CA, Customer).
+A comprehensive wholesale business management system built with React, TypeScript, Vite, and Supabase. This application streamlines customer management, billing, payments, orders, and inventory tracking for wholesale trading businesses.
 
-## 📋 Project Overview
+## 🚀 Features
 
-Jay Shree Traders Hub is a modern web application designed to streamline business operations including:
-- **Customer Management** - Create, view, edit customer profiles with outstanding balance tracking
-- **Product Catalog** - Manage products with pricing, inventory, and stock alerts
-- **Order Management** - Process and track customer orders with real-time updates
-- **Billing System** - Generate bills and downloadable PDF invoices
-- **Payment Processing** - Record payments, bulk payments, and payment approval workflow
-- **Coupon Management** - Create and manage discount coupons for products
-- **Analytics Dashboard** - Financial reports, P&L, cash flow, customer aging analysis
-- **Payment Requests** - Customer bulk payment requests with admin approval system
-- **Admin Dashboard** - Comprehensive overview of business metrics
-- **Role-Based Access** - Admin, Chartered Accountant (CA), and Customer roles
-- **Export Functionality** - Export data to CSV and Excel formats
-- **Real-time Updates** - Live data synchronization across all pages
+### Core Functionality
+- **Customer Management**: Add, edit, and manage wholesale customers with credit limits
+- **Billing System**: Generate bills, track payments, and manage outstanding balances
+- **Payment Processing**: Record payments, approve payment requests, send reminders
+- **Order Management**: Create and track customer orders
+- **Inventory Tracking**: Manage products and stock levels
+- **Analytics Dashboard**: View sales trends, customer insights, and business metrics
 
-## 🛠 Technology Stack
+### User Roles
+- **Admin**: Full access to all features including customer management, analytics, and system configuration
+- **Customer**: View bills, make payment requests, place orders, and track history
+- **CA (Chartered Accountant)**: Read-only access to bills and financial records
 
-**Frontend:**
-- Vite 7.3.1 - Fast build tool and dev server
-- React 18+ - UI framework
-- TypeScript - Type-safe JavaScript
-- Tailwind CSS - Utility-first CSS framework
-- shadcn/ui - High-quality React components
-- Lucide React - Beautiful icon library
-- Recharts - Data visualization and charts
-- jsPDF - PDF generation for invoices
-- XLSX - Excel export functionality
-- React Router - Client-side routing
+### Additional Features
+- WhatsApp payment reminders in Hindi/English
+- Credit limit management per customer
+- Excel/CSV export for customer and billing data
+- AI-powered chat assistant
+- Responsive design for desktop and mobile
 
-**Backend:**
-- Supabase - PostgreSQL database, authentication, real-time features
-- Edge Functions - Serverless backend functions (Deno runtime)
-- PostgreSQL - Relational database with RLS (Row Level Security)
-- Real-time subscriptions - Live data updates
+## 🛠️ Tech Stack
 
-**Development:**
-- Node.js 20.12.2+
-- npm - Package manager
-- Vite + TypeScript - Type-safe development
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for fast development and building
+- **TailwindCSS** for styling
+- **Shadcn UI** for component library
+- **React Router** for navigation
+- **Recharts** for analytics visualization
 
-## 📦 Installation
+### Backend
+- **Supabase** for:
+  - PostgreSQL database
+  - Authentication
+  - Row Level Security (RLS)
+  - Edge Functions (serverless)
+  - Real-time subscriptions
 
-### Prerequisites
-- Node.js 20.19+ or 22.12+ (currently using 20.12.2)
-- npm 9+
+### Development Tools
+- **ESLint** for code quality
+- **TypeScript** for type safety
+- **Git** for version control
+
+## 📋 Prerequisites
+
+- Node.js 18+ and npm
+- Supabase CLI (for local development)
 - Git
 
-### Setup Steps
+## 🔧 Installation
 
+1. **Clone the repository**
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd jst_web
+git clone https://github.com/yourusername/jst-website.git
+cd jst-website
+```
 
-# Install dependencies
+2. **Install dependencies**
+```bash
 npm install
-
-# Create environment file
-cp .env.example .env.local
-
-# Configure Supabase credentials in .env.local
-# VITE_SUPABASE_URL=your_supabase_url
-# VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key
-
-# Start development server
-npm run dev
 ```
 
-The application will be available at `http://localhost:8080`
+3. **Set up environment variables**
 
-## 🚀 Development
+Create a `.env.local` file in the root directory:
 
-### Available Scripts
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+VITE_SUPABASE_PROJECT_ID=your_project_id
+```
 
+> ⚠️ **Note**: Never commit `.env` or `.env.local` files to Git!
+
+4. **Run database migrations** (if using Supabase CLI locally)
 ```bash
-# Start development server with hot reload
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Run linter
-npm run lint
+npx supabase db push
 ```
+
+5. **Start the development server**
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:5173`
+
+## 🏗️ Project Structure
+
+```
+jst_web/
+├── src/
+│   ├── components/        # Reusable UI components
+│   ├── contexts/          # React Context providers (Auth, etc.)
+│   ├── hooks/             # Custom React hooks
+│   ├── integrations/      # Supabase client and types
+│   ├── pages/             # Page components
+│   │   ├── AuthPage.tsx   # Login/Register
+│   │   ├── Dashboard.tsx  # Main dashboard
+│   │   ├── CustomersPage.tsx
+│   │   ├── BillsPage.tsx
+│   │   ├── AnalyticsPage.tsx
+│   │   └── ...
+│   ├── lib/               # Utility functions
+│   ├── App.tsx            # Main app component
+│   └── main.tsx           # Entry point
+├── supabase/
+│   ├── functions/         # Edge Functions
+│   │   ├── create-customer/
+│   │   ├── update-customer/
+│   │   ├── approve-payment-request/
+│   │   └── ...
+│   ├── migrations/        # Database migrations
+│   └── config.toml        # Supabase configuration
+├── public/                # Static assets
+├── .env.local            # Local environment variables (not in Git)
+├── .gitignore
+├── package.json
+├── tailwind.config.ts
+├── tsconfig.json
+└── vite.config.ts
+```
+
+## 🔐 Authentication
+
+The system supports multiple authentication methods:
+- Email/Password login
+- Phone number login (format: `phone@jst.com`)
+- OTP verification (via SMS)
+
+### Default User Roles
+- Customers are created with email `{phone}@jst.com` and password = phone number
+- Admin and CA users are set up via the database
 
 ## 🗄️ Database Schema
 
-### Tables
-- `profiles` - User profile information
-- `user_roles` - User role assignments
-- `products` - Product catalog with inventory tracking (stock_quantity, minimum_stock_level, reorder_point)
-- `orders` - Customer orders
-- `order_items` - Individual items in orders with coupon support
-- `bills` - Billing records
+Key tables:
+- `profiles` - User profiles with business information and credit limits
+- `user_roles` - Role assignments (admin/customer/ca)
+- `bills` - Customer bills and invoices
 - `payments` - Payment records
-- `payment_requests` - Customer payment requests awaiting approval
-- `payment_reminders` - Payment reminder logs (admin-only)
-- `sample_requests` - Sample request tracking
-- `coupons` - Discount coupon codes for products
-- `stock_history` - Inventory change tracking (planned)
-
-### Views
-- `low_stock_products` - Products at or below minimum stock level
-
-### RLS Policies
-- **Admin** - Full access to all tables, can approve payment requests
-- **CA (Chartered Accountant)** - View bills, orders, payments (read-only access)
-- **Customer** - Access to own orders, bills, payments, and payment requests
-
-## 🔐 Security
-
-- Row-Level Security (RLS) enforced on all tables
-- JWT authentication disabled on create-customer function (development)
-- Input validation on all Edge Functions
-- CORS restricted to `http://localhost:8080`
-- Environment variables protected in `.env.local`
-
-See [SECURITY.md](SECURITY.md) for detailed security information.
-
-## 📝 Environment Variables
-
-```env
-# Supabase Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key
-```
-
-## 👥 User Roles
-
-### Admin
-- Create, view, edit, delete customers
-- Manage products and inventory (stock levels, reorder points)
-- Create and manage discount coupons
-- Create and process orders
-- Record payments (single and bulk)
-- Approve/reject customer payment requests
-- View all bills and download PDF invoices
-- Access analytics dashboard (P&L, cash flow, aging reports)
-- Export data to CSV/Excel
-- Manage payment reminders
-- View low stock alerts
-
-### Chartered Accountant (CA)
-- View bills and orders (read-only)
-- View payment history
-- Export bills and orders to CSV/Excel
-- Cannot modify orders or payments
-- Cannot create customers
-- No access to analytics or payment approvals
-
-### Customer
-- View own orders and order history
-- View own bills
-- Download PDF invoices
-- Submit bulk payment requests
-- Track payment request status (pending/approved/rejected)
-- Track payment history
-- Request product samples
-- Place orders with coupon codes
-
-## 🧪 Testing
-
-### Test Users
-
-**Admin:**
-- Email: admin@jst.com
-- Phone: 9999999999 (password)
-
-**CA:**
-- Email: ca@jst.com
-- Phone: 9999999999 (password)
-
-**Customers:** Created via admin panel
-
-## 📚 API Documentation
-
-### Edge Functions
-
-#### create-customer
-Create a new customer account and auth user
-
-```bash
-POST /functions/v1/create-customer
-```
-
-#### create-ca-user
-Create a Chartered Accountant user (Admin only)
-
-```bash
-POST /functions/v1/create-ca-user
-```
-
-#### create-payment-request
-Customer creates a payment request for bulk payment
-
-```bash
-POST /functions/v1/create-payment-request
-Body: { customerId, amount, billIds[] }
-```
-
-#### approve-payment-request
-Admin approves or rejects a payment request
-
-```bash
-POST /functions/v1/approve-payment-request
-Body: { paymentRequestId, action: "approve" | "reject" }
-```
-
-#### record-customer-payment
-Records customer payment with bill allocation
-
-```bash
-POST /functions/v1/record-customer-payment
-Body: { mode: "single" | "bulk", amount, bill_id?, payment_method, transaction_id?, notes? }
-```
-
-## ✨ Key Features
-
-### For Admins
-- **Analytics Dashboard**: P&L reports, cash flow analysis, customer aging buckets
-- **Payment Approvals**: Review and approve customer payment requests
-- **Inventory Management**: Track stock levels with low-stock alerts
-- **Coupon System**: Create percentage or fixed-amount discount codes
-- **Bulk Operations**: Export data to CSV/Excel for reporting
-- **Invoice Generation**: Download professional PDF invoices
-- **Real-time Updates**: Live data synchronization
-
-### For Customers
-- **Bulk Payments**: Submit payment requests for multiple bills at once
-- **Payment Tracking**: Monitor payment request status
-- **UPI Integration**: Quick pay with UPI deep links
-- **Invoice Downloads**: Get PDF copies of bills
-- **Order Tracking**: Real-time order status updates
-
-## 🐛 Known Issues
-
-- Node.js version warning: Running 20.12.2, recommend 20.19+ or 22.12+
-- Browserslist database is outdated (run `npx update-browserslist-db@latest`)
+- `payment_requests` - Payment approval workflow
+- `orders` - Customer orders
+- `products` - Product catalog
+- `payment_reminders` - WhatsApp reminder tracking
 
 ## 🚀 Deployment
 
-### Production Checklist
-1. Update CORS from `localhost:8080` to production domain
-2. Enable JWT verification on Edge Functions
-3. Set strong environment variables
-4. Configure custom domain in Supabase
-5. Run security audit: `npm audit`
-6. Update Node.js to 20.19+ or 22.12+
-
-### Deploy to Vercel/Netlify
-
+### Build for Production
 ```bash
-# Build for production
 npm run build
-
-# Deploy dist folder to your hosting service
 ```
 
-## 📞 Support & Contact
+The build output will be in the `dist/` directory.
 
-For issues or questions, please contact the development team.
+### Deploy to Vercel (Recommended)
+1. Push your code to GitHub
+2. Import the repository in Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy!
+
+### Deploy Edge Functions
+```bash
+npx supabase functions deploy --project-ref your_project_ref
+```
+
+## 🔒 Security Features
+
+- Row Level Security (RLS) policies on all tables
+- JWT authentication (optional - currently disabled)
+- Service role key for admin operations
+- Input validation and sanitization
+- CORS protection on Edge Functions
+
+## 📝 Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**"Edge Function returned a non-2xx status code"**
+- Check Supabase function logs in the dashboard
+- Verify environment variables are set correctly
+- Ensure JWT verification is disabled if needed
+
+**Database connection errors**
+- Verify `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are correct
+- Check if the Supabase project is active
+
+**Authentication issues**
+- Clear browser localStorage
+- Check user roles in the `user_roles` table
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
 
 ## 📄 License
 
-Proprietary - Jay Shree Traders
+This project is proprietary and confidential.
 
-## 🔄 Version History
+## 👥 Contact
 
-- **v2.0.0** (Jan 12, 2026) - Major update:
-  - Payment request and approval system
-  - Bulk payment functionality for customers
-  - Coupon management system
-  - Inventory tracking with stock levels
-  - Analytics dashboard with P&L and cash flow
-  - Customer aging reports
-  - Export to CSV/Excel
-  - PDF invoice generation
-  - Real-time data updates
-  - PWA support
-  - Enhanced RLS policies
-- **v1.0.0** (Jan 2026) - Initial release with core functionality
+For support or inquiries, please contact Jay Shree Traders.
+
+---
+
+**Built with ❤️ for wholesale businesses**

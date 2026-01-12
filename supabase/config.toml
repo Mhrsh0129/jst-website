@@ -1,4 +1,4 @@
-project_id = "sqfzyyemlfmbpmxtwacs"
+project_id = "pqlycsuxmyuqacxbldey"
 
 [functions.ai-chat]
 verify_jwt = false
@@ -6,11 +6,14 @@ verify_jwt = false
 [functions.create-customer]
 verify_jwt = false
 
-[functions.create-ca-user]
+[functions.update-customer]
 verify_jwt = false
 
-[functions.create-test-users]
+[functions.approve-payment-request]
 verify_jwt = false
 
-[functions.create-admin-user]
+[functions.create-payment-request]
+verify_jwt = false
+
+[functions.record-customer-payment]
 verify_jwt = false

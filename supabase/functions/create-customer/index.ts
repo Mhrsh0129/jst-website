@@ -17,9 +17,9 @@ function sanitizeInput(input: string): string {
   return input.trim().slice(0, 500); // Limit length and trim whitespace
 }
 
-// CORS headers - restricted to localhost for development
+// CORS headers - restricted to all origins for broad access (Vercel/mobile)
 const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "http://localhost:8080",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Max-Age": "86400",
@@ -32,10 +32,13 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
+    console.log("Received request body:", body);
+
     let { full_name, business_name, phone, email, address, gst_number, credit_limit } = body;
 
     // Input validation
     if (!full_name || typeof full_name !== "string") {
+      console.error("Validation failed: full_name invalid");
       return new Response(JSON.stringify({ error: "Full name is required and must be a string" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -75,7 +78,13 @@ serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+    console.log("Creating admin client...");
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
 
     // Auto-generate email and password from phone number
     // If phone exists: email = phone@jst.com, password = phone
@@ -101,6 +110,7 @@ serve(async (req: Request) => {
       });
     }
 
+    console.log("Creating user with email:", loginEmail);
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email: loginEmail,
       password: loginPassword,
@@ -113,28 +123,38 @@ serve(async (req: Request) => {
     });
 
     if (createError) {
+      console.error("Auth create error:", createError);
       return new Response(JSON.stringify({ error: `Auth error: ${createError.message}` }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    console.log("User created, updating profile...");
+    const profileUpdate: any = {
+      full_name,
+      business_name,
+      phone,
+      email,
+      address,
+      gst_number,
+    };
+
+    // Add credit_limit if provided
+    if (credit_limit !== undefined && credit_limit !== null) {
+      profileUpdate.credit_limit = parseFloat(String(credit_limit));
+    }
+
     const { error: profileError } = await adminClient
       .from("profiles")
-      .update({
-        full_name,
-        business_name,
-        phone,
-        email,
-        address,
-        gst_number,
-      })
+      .update(profileUpdate)
       .eq("user_id", newUser.user.id);
 
     if (profileError) {
-      console.error("Profile update error:", profileError.message);
+      console.error("Profile update error:", profileError);
     }
 
+    console.log("Customer created successfully");
     return new Response(
       JSON.stringify({
         success: true,
@@ -146,6 +166,7 @@ serve(async (req: Request) => {
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    console.error("Unhandled error:", error);
     const msg = error instanceof Error ? error.message : String(error);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,

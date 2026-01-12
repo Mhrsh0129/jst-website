@@ -189,11 +189,12 @@ const AddBillDialog = ({
       resetForm();
       onBillAdded();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating bill:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create bill.";
       toast({
         title: "Error",
-        description: error.message || "Failed to create bill.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -341,7 +342,7 @@ const AddBillDialog = ({
           {/* Payment Status */}
           <div className="space-y-3">
             <Label className="text-base font-semibold">Payment Received</Label>
-            <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as any)}>
+            <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as "none" | "full" | "partial")}>
               <SelectTrigger>
                 <SelectValue placeholder="Payment status" />
               </SelectTrigger>

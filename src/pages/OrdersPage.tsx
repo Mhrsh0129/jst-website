@@ -17,7 +17,10 @@ import {
   ShoppingCart,
   Loader2,
   Package,
+  Edit2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import EditOrderDialog from "@/components/EditOrderDialog";
 
 interface Order {
   id: string;
@@ -31,12 +34,17 @@ interface Order {
 const OrdersPage = () => {
   const { user, userRole, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+  
+  // Edit Dialog State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -69,7 +77,58 @@ const OrdersPage = () => {
     if (user) {
       fetchOrders();
     }
+
+    // Realtime subscription for instant updates
+    const channel = supabase
+      .channel("orders_updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+        },
+        (payload) => {
+          console.log("Realtime update:", payload);
+          // Refresh orders on any change
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, userRole]);
+
+  const openEditDialog = (order: Order) => {
+    setSelectedOrder(order);
+    setIsEditOpen(true);
+  };
+
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: newStatus })
+        .eq("id", orderId);
+
+      if (error) throw error;
+
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      toast({
+        title: "Status updated",
+        description: `Order status updated to ${newStatus}`,
+      });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update order status",
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -252,13 +311,30 @@ const OrdersPage = () => {
                       <h3 className="font-semibold text-foreground">
                         {order.order_number}
                       </h3>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full capitalize ${getStatusColor(
-                          order.status
-                        )}`}
-                      >
-                        {order.status}
-                      </span>
+                      {userRole === "admin" ? (
+                        <Select
+                          defaultValue={order.status}
+                          onValueChange={(val) => updateOrderStatus(order.id, val)}
+                        >
+                          <SelectTrigger className="h-7 w-[130px] text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="processing">Processing</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full capitalize ${getStatusColor(
+                            order.status
+                          )}`}
+                        >
+                          {order.status}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Placed: {new Date(order.created_at).toLocaleDateString()}
@@ -272,15 +348,40 @@ const OrdersPage = () => {
 
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total Amount</p>
-                    <p className="font-display text-xl font-bold text-foreground">
+                    <p className="font-display text-xl font-bold text-foreground mb-2">
                       ₹{Number(order.total_amount).toLocaleString()}
                     </p>
+                    
+                    {/* Show Edit Button for Customers on Pending Orders */}
+                    {userRole === "customer" && order.status === "pending" && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => openEditDialog(order)}
+                        className="w-full sm:w-auto"
+                      >
+                        <Edit2 className="w-3 h-3 mr-2" />
+                        Edit Order
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
           </div>
         )}
+        
+        {/* Edit Dialog */}
+        <EditOrderDialog 
+          isOpen={isEditOpen} 
+          onClose={() => setIsEditOpen(false)} 
+          order={selectedOrder}
+          onOrderUpdated={() => {
+            // Re-fetch logic is handled by the parent effect or Realtime, 
+            // but we can trigger a manual fetch if needed. 
+            // For now, let Realtime handle it.
+          }}
+        />
       </main>
     </div>
   );

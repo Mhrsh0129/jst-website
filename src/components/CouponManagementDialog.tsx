@@ -58,13 +58,6 @@ const CouponManagementDialog = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Ensure data loads whenever dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      fetchProductsAndCoupons();
-    }
-  }, [isOpen]);
-
   const fetchProductsAndCoupons = async () => {
     setIsLoading(true);
     try {
@@ -96,23 +89,36 @@ const CouponManagementDialog = ({
       }
 
       // Fetch coupons
+
       const { data: couponsData, error: couponsError } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from("coupons" as any)
         .select("*, product:product_id(id, name, price_per_meter)")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .order("created_at", { ascending: false }) as any);
 
       if (couponsError) throw couponsError;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setCoupons((couponsData as any) || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Ensure data loads whenever dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchProductsAndCoupons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const handleCreateCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,7 +137,9 @@ const CouponManagementDialog = ({
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error("User not authenticated");
 
+
       const { error } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from("coupons" as any)
         .insert({
           code: couponCode.toUpperCase().trim(),
@@ -140,6 +148,7 @@ const CouponManagementDialog = ({
           discount_value: parseFloat(discountValue),
           is_active: true,
           created_by: userData.user.id,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any);
 
       if (error) throw error;
@@ -153,10 +162,11 @@ const CouponManagementDialog = ({
       setDiscountValue("");
       setSelectedProduct("");
       await fetchProductsAndCoupons();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -170,9 +180,12 @@ const CouponManagementDialog = ({
     }
 
     try {
+
       const { error } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from("coupons" as any)
         .delete()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .eq("id", couponId) as any);
 
       if (error) throw error;
@@ -183,10 +196,11 @@ const CouponManagementDialog = ({
       });
 
       await fetchProductsAndCoupons();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An error occurred";
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -250,7 +264,7 @@ const CouponManagementDialog = ({
                   <Label htmlFor="discount-type">Discount Type</Label>
                   <Select
                     value={discountType}
-                    onValueChange={(value: any) => setDiscountType(value)}
+                    onValueChange={(value: "fixed" | "percentage") => setDiscountType(value)}
                   >
                     <SelectTrigger id="discount-type">
                       <SelectValue />

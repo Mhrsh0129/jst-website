@@ -68,7 +68,7 @@ const BillsPage = () => {
         .maybeSingle();
 
       if (profileError) throw profileError;
-      
+
       // If no profile found, use default values
       const customerProfile = profile || {
         full_name: "Customer",
@@ -81,6 +81,7 @@ const BillsPage = () => {
 
       // Fetch order details if exists
       let order = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let orderItems: any[] = [];
 
       if (bill.order_id) {
@@ -135,9 +136,9 @@ const BillsPage = () => {
         },
         order
           ? {
-              order_number: order.order_number,
-              created_at: order.created_at,
-            }
+            order_number: order.order_number,
+            created_at: order.created_at,
+          }
           : null,
         orderItems
       );
@@ -182,7 +183,7 @@ const BillsPage = () => {
         console.error("Error fetching bills:", error);
       } else {
         let billsData = data || [];
-        
+
         // For admins, fetch customer names
         if (userRole === "admin" && billsData.length > 0) {
           const customerIds = [...new Set(billsData.map(b => b.customer_id))];
@@ -190,14 +191,14 @@ const BillsPage = () => {
             .from("profiles")
             .select("user_id, full_name")
             .in("user_id", customerIds);
-          
+
           const profilesMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
           billsData = billsData.map(b => ({
             ...b,
             customer_name: profilesMap.get(b.customer_id) || "Unknown"
           }));
         }
-        
+
         setBills(billsData);
       }
 
@@ -236,7 +237,7 @@ const BillsPage = () => {
     const matchesStatus = statusFilter === "all" ? true : bill.status === statusFilter;
     const matchesSearch = searchTerm
       ? bill.bill_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (bill.notes || "").toLowerCase().includes(searchTerm.toLowerCase())
+      (bill.notes || "").toLowerCase().includes(searchTerm.toLowerCase())
       : true;
     const created = new Date(bill.created_at);
     const matchesFrom = fromDate ? created >= new Date(fromDate) : true;
@@ -485,7 +486,7 @@ const BillsPage = () => {
           onPaymentSubmitted={() => {
             // Refresh bills after payment
             const reload = async () => {
-              let query = supabase
+              const query = supabase
                 .from("bills")
                 .select("*")
                 .order("created_at", { ascending: false })

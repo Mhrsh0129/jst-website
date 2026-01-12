@@ -31,6 +31,11 @@ check_policies.sql
 *.sql.backup
 *.sql.tmp
 
+# Debug/report files
+report.txt
+report*.txt
+eslint_report.json
+
 # Lock files (optional - team preference)
 package-lock.json
 
@@ -44,3 +49,5 @@ package-lock.json
 *.njsproj
 *.sln
 *.sw?
+
+ADMIN_GUIDE.txt

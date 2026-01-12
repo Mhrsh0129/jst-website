@@ -39,12 +39,12 @@ const OrderModal = ({ isOpen, onClose, product, userId }: OrderModalProps) => {
 
   const quantityNum = parseFloat(quantity) || 0;
   let pricePerMeter = Number(product.price_per_meter);
-  
+
   // Apply discount if available
   if (discount > 0) {
     pricePerMeter -= discount;
   }
-  
+
   const totalAmount = quantityNum * pricePerMeter;
 
   const validateCoupon = async () => {
@@ -56,16 +56,19 @@ const OrderModal = ({ isOpen, onClose, product, userId }: OrderModalProps) => {
     setIsValidatingCoupon(true);
     try {
       const { data: coupon, error } = await (supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .from("coupons" as any)
         .select("*")
         .eq("code", couponCode.toUpperCase())
         .eq("product_id", product.id)
         .eq("is_active", true)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .maybeSingle() as any);
 
       if (error) throw error;
 
       if (coupon) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const couponData = coupon as any;
         if (couponData.discount_type === "fixed") {
           setDiscount(couponData.discount_value);

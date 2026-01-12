@@ -66,6 +66,7 @@ const PaymentHistoryPage = () => {
         }
 
         const { data: paymentsData } = await query;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let requestsData: any[] = [];
 
         if (paymentsData) {
@@ -80,6 +81,7 @@ const PaymentHistoryPage = () => {
 
         // Fetch pending payment requests for customers
         if (userRole === "customer") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const { data: fetchedRequests } = await (supabase as any)
             .from("payment_requests")
             .select("*")
@@ -90,9 +92,12 @@ const PaymentHistoryPage = () => {
 
           if (requestsData.length > 0) {
             totalApprovedRequestsAmount = requestsData
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .filter((r: any) => r.status === "approved")
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             requestsData.forEach((r: any) => {
               allItems.push({
                 id: r.id,
@@ -123,15 +128,15 @@ const PaymentHistoryPage = () => {
     };
 
     fetchPayments();
-    
+
     // Set up real-time subscription
     const channel = supabase
       .channel("payments_changes")
       .on(
         "postgres_changes",
-        { 
-          event: "*", 
-          schema: "public", 
+        {
+          event: "*",
+          schema: "public",
           table: "payments",
           filter: userRole === "customer" ? `customer_id=eq.${user.id}` : undefined
         },
@@ -139,9 +144,9 @@ const PaymentHistoryPage = () => {
       )
       .on(
         "postgres_changes",
-        { 
-          event: "*", 
-          schema: "public", 
+        {
+          event: "*",
+          schema: "public",
           table: "payment_requests",
           filter: userRole === "customer" ? `customer_id=eq.${user.id}` : undefined
         },
@@ -257,28 +262,26 @@ const PaymentHistoryPage = () => {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        payment.type === "pending_request" 
-                          ? "bg-yellow-500/10" 
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${payment.type === "pending_request"
+                          ? "bg-yellow-500/10"
                           : "bg-green-500/10"
-                      }`}>
-                        <CreditCard className={`w-5 h-5 ${
-                          payment.type === "pending_request" 
-                            ? "text-yellow-500" 
+                        }`}>
+                        <CreditCard className={`w-5 h-5 ${payment.type === "pending_request"
+                            ? "text-yellow-500"
                             : "text-green-500"
-                        }`} />
+                          }`} />
                       </div>
                       <div>
                         <p className="font-medium text-foreground">
                           ₹{Number(payment.amount).toLocaleString()}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {payment.type === "pending_request" 
-                            ? (payment.status === "pending" 
-                              ? "Awaiting Approval" 
+                          {payment.type === "pending_request"
+                            ? (payment.status === "pending"
+                              ? "Awaiting Approval"
                               : payment.status === "approved"
-                              ? "Payment Approved"
-                              : "Payment Rejected")
+                                ? "Payment Approved"
+                                : "Payment Rejected")
                             : "Payment Received"}
                         </p>
                         {userRole === "admin" && payment.customer_name && (
@@ -287,21 +290,20 @@ const PaymentHistoryPage = () => {
                           </p>
                         )}
                         <div className="flex items-center gap-2 mt-1">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            payment.type === "pending_request"
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${payment.type === "pending_request"
                               ? payment.status === "pending"
                                 ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
                                 : payment.status === "approved"
-                                ? "bg-green-50 text-green-800 border border-green-200"
-                                : "bg-red-50 text-red-800 border border-red-200"
+                                  ? "bg-green-50 text-green-800 border border-green-200"
+                                  : "bg-red-50 text-red-800 border border-red-200"
                               : "bg-accent/20 text-accent-foreground"
-                          }`}>
+                            }`}>
                             {payment.type === "pending_request"
-                              ? payment.status === "pending" 
+                              ? payment.status === "pending"
                                 ? "Pending"
                                 : payment.status === "approved"
-                                ? "Approved"
-                                : "Rejected"
+                                  ? "Approved"
+                                  : "Rejected"
                               : getPaymentMethodLabel(payment.payment_method)}
                           </span>
                           {payment.transaction_id && (

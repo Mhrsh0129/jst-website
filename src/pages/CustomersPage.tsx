@@ -97,26 +97,26 @@ const CustomersPage = () => {
   const [newCreditLimit, setNewCreditLimit] = useState("");
   const [sendingReminder, setSendingReminder] = useState(false);
   const [reminderMessage, setReminderMessage] = useState("");
-  
+
   // New state for admin features
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [isDeletingCustomer, setIsDeletingCustomer] = useState(false);
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // State for add bill dialog
   const [isAddingBill, setIsAddingBill] = useState(false);
   const [billCustomer, setBillCustomer] = useState<CustomerWithBalance | null>(null);
-  
+
   // State for viewing customer bills
   const [isViewingBills, setIsViewingBills] = useState(false);
   const [viewingBillsCustomer, setViewingBillsCustomer] = useState<CustomerWithBalance | null>(null);
-  
+
   // State for recording payment
   const [isRecordingPayment, setIsRecordingPayment] = useState(false);
   const [paymentCustomer, setPaymentCustomer] = useState<CustomerWithBalance | null>(null);
-  
+
   // State for customer name autocomplete
   const [showNameSuggestions, setShowNameSuggestions] = useState(false);
   const [nameSuggestions, setNameSuggestions] = useState<CustomerWithBalance[]>([]);
@@ -154,7 +154,7 @@ const CustomersPage = () => {
 
         // Calculate balances per customer
         const balanceMap = new Map<string, { outstanding: number; paid: number }>();
-        
+
         billsData?.forEach(bill => {
           const existing = balanceMap.get(bill.customer_id) || { outstanding: 0, paid: 0 };
           balanceMap.set(bill.customer_id, {
@@ -185,12 +185,54 @@ const CustomersPage = () => {
     if (!selectedCustomer || !newCreditLimit) return;
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ credit_limit: parseFloat(newCreditLimit) })
-        .eq("id", selectedCustomer.id);
+      console.log("Updating credit limit for:", selectedCustomer.user_id, "to:", newCreditLimit);
 
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("update-customer", {
+        body: {
+          user_id: selectedCustomer.user_id,
+          credit_limit: parseFloat(newCreditLimit),
+        },
+      });
+
+      if (error) {
+        // Log everything about the error to understand its structure
+        console.error("Function error:", error);
+        console.error("Error type:", error.constructor?.name);
+        console.error("Error message:", error.message);
+        console.error("Error context:", error.context);
+
+        let errorMessage = "Failed to update credit limit.";
+
+        // Error context is a Response object - we need to read its body
+        if (error.context instanceof Response) {
+          try {
+            // Clone the response so we can read it (response body can only be read once)
+            const responseClone = error.context.clone();
+            const responseText = await responseClone.text();
+            console.error("Response body:", responseText);
+
+            // Try to parse as JSON
+            try {
+              const responseJson = JSON.parse(responseText);
+              if (responseJson.error) {
+                errorMessage = responseJson.error;
+              }
+            } catch {
+              // Not JSON, use the raw text
+              errorMessage = responseText || "Failed to update credit limit.";
+            }
+          } catch (readError) {
+            console.error("Error reading response:", readError);
+          }
+        } else if (error.message && error.message !== "Edge Function returned a non-2xx status code") {
+          errorMessage = error.message;
+        }
+
+        console.error("Final error message to display:", errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      console.log("Update successful:", data);
 
       setCustomers(prev =>
         prev.map(c =>
@@ -207,11 +249,12 @@ const CustomersPage = () => {
 
       setEditingCreditLimit(false);
       setSelectedCustomer(null);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error updating credit limit:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to update credit limit.";
       toast({
         title: "Error",
-        description: "Failed to update credit limit.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -282,7 +325,7 @@ const CustomersPage = () => {
     // Either email or phone is required
     const hasEmail = formData.email.trim() && formData.email.includes("@");
     const hasPhone = formData.phone.trim().length >= 10;
-    
+
     if (!hasEmail && !hasPhone) {
       toast({
         title: "Validation Error",
@@ -294,23 +337,18 @@ const CustomersPage = () => {
 
     setIsSaving(true);
     try {
-      // Get current session to verify we're authenticated
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast({
-          title: "Session Expired",
-          description: "Please log in again to add customers.",
-          variant: "destructive",
-        });
-        navigate("/auth");
-        return;
-      }
+      console.log("Calling create-customer with data:", {
+        full_name: formData.full_name.trim(),
+        business_name: formData.business_name.trim() || null,
+        phone: formData.phone.trim() || null,
+        email: formData.email.trim() || null,
+        address: formData.address.trim() || null,
+        gst_number: formData.gst_number.trim() || null,
+        credit_limit: parseFloat(formData.credit_limit) || 50000,
+      });
 
-      // Call edge function to create customer with proper auth user
+      // Call edge function to create customer (JWT disabled)
       const { data, error } = await supabase.functions.invoke("create-customer", {
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
         body: {
           full_name: formData.full_name.trim(),
           business_name: formData.business_name.trim() || null,
@@ -323,7 +361,33 @@ const CustomersPage = () => {
         },
       });
 
-      if (error) throw error;
+      console.log("Response from create-customer:", { data, error });
+
+      console.log("Response from create-customer:", { data, error });
+
+      if (error) {
+        // Try to extract the actual error message from the response
+        console.error("Edge function error:", error);
+
+        // Check if there's a context with more details
+        if (error.context instanceof Response) {
+          const responseClone = error.context.clone();
+          const responseText = await responseClone.text();
+          console.error("Error response body:", responseText);
+
+          try {
+            const responseJson = JSON.parse(responseText);
+            if (responseJson.error) {
+              throw new Error(responseJson.error);
+            }
+          } catch (parseError) {
+            // If not JSON, throw with the text
+            throw new Error(responseText || "Failed to add customer");
+          }
+        }
+
+        throw error;
+      }
 
       if (data.error) {
         throw new Error(data.error);
@@ -351,11 +415,17 @@ const CustomersPage = () => {
 
       setIsAddingCustomer(false);
       setFormData(initialFormData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding customer:", error);
+      let errorMessage = error instanceof Error ? error.message : "Failed to add customer.";
+
+      if (errorMessage.includes("non-2xx")) {
+        errorMessage += ". Check function logs/secrets.";
+      }
+
       toast({
         title: "Error",
-        description: error.message || "Failed to add customer.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -375,9 +445,9 @@ const CustomersPage = () => {
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
+      const { error } = await supabase.functions.invoke("update-customer", {
+        body: {
+          user_id: selectedCustomer.user_id,
           full_name: formData.full_name.trim(),
           business_name: formData.business_name.trim() || null,
           phone: formData.phone.trim() || null,
@@ -385,8 +455,8 @@ const CustomersPage = () => {
           address: formData.address.trim() || null,
           gst_number: formData.gst_number.trim() || null,
           credit_limit: parseFloat(formData.credit_limit) || 50000,
-        })
-        .eq("id", selectedCustomer.id);
+        },
+      });
 
       if (error) throw error;
 
@@ -395,15 +465,15 @@ const CustomersPage = () => {
         prev.map(c =>
           c.id === selectedCustomer.id
             ? {
-                ...c,
-                full_name: formData.full_name.trim(),
-                business_name: formData.business_name.trim() || null,
-                phone: formData.phone.trim() || null,
-                email: formData.email.trim() || null,
-                address: formData.address.trim() || null,
-                gst_number: formData.gst_number.trim() || null,
-                credit_limit: parseFloat(formData.credit_limit) || 50000,
-              }
+              ...c,
+              full_name: formData.full_name.trim(),
+              business_name: formData.business_name.trim() || null,
+              phone: formData.phone.trim() || null,
+              email: formData.email.trim() || null,
+              address: formData.address.trim() || null,
+              gst_number: formData.gst_number.trim() || null,
+              credit_limit: parseFloat(formData.credit_limit) || 50000,
+            }
             : c
         )
       );
@@ -416,11 +486,12 @@ const CustomersPage = () => {
       setIsEditingCustomer(false);
       setSelectedCustomer(null);
       setFormData(initialFormData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating customer:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to update customer.";
       toast({
         title: "Error",
-        description: error.message || "Failed to update customer.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -450,11 +521,12 @@ const CustomersPage = () => {
 
       setIsDeletingCustomer(false);
       setSelectedCustomer(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error deleting customer:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete customer.";
       toast({
         title: "Error",
-        description: error.message || "Failed to delete customer.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -533,11 +605,11 @@ const CustomersPage = () => {
   // Handle name input change for autocomplete
   const handleNameInputChange = (value: string) => {
     setFormData({ ...formData, full_name: value });
-    
+
     if (isAddingCustomer && value.length >= 2) {
       const matches = customers.filter(
         c => c.full_name.toLowerCase().includes(value.toLowerCase()) ||
-             c.business_name?.toLowerCase().includes(value.toLowerCase())
+          c.business_name?.toLowerCase().includes(value.toLowerCase())
       ).slice(0, 5);
       setNameSuggestions(matches);
       setShowNameSuggestions(matches.length > 0);
@@ -559,7 +631,7 @@ const CustomersPage = () => {
       password: "",
     });
     setShowNameSuggestions(false);
-    
+
     // Show option to add bill instead
     toast({
       title: "Existing Customer Found",
@@ -596,7 +668,7 @@ const CustomersPage = () => {
         .select("customer_id, balance_due, paid_amount");
 
       const balanceMap = new Map<string, { outstanding: number; paid: number }>();
-      
+
       billsData?.forEach(bill => {
         const existing = balanceMap.get(bill.customer_id) || { outstanding: 0, paid: 0 };
         balanceMap.set(bill.customer_id, {
@@ -781,13 +853,12 @@ const CustomersPage = () => {
             <div className="divide-y divide-border">
               {filteredCustomers.map((customer) => {
                 const isOverLimit = customer.totalOutstanding > customer.credit_limit;
-                
+
                 return (
                   <div
                     key={customer.id}
-                    className={`p-4 hover:bg-muted/50 transition-colors ${
-                      isOverLimit ? "bg-red-50 dark:bg-red-950/20" : ""
-                    }`}
+                    className={`p-4 hover:bg-muted/50 transition-colors ${isOverLimit ? "bg-red-50 dark:bg-red-950/20" : ""
+                      }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex-1">
@@ -975,8 +1046,8 @@ const CustomersPage = () => {
       </Dialog>
 
       {/* Add/Edit Customer Dialog */}
-      <Dialog 
-        open={isAddingCustomer || isEditingCustomer} 
+      <Dialog
+        open={isAddingCustomer || isEditingCustomer}
         onOpenChange={(open) => {
           if (!open) {
             setIsAddingCustomer(false);
@@ -991,8 +1062,8 @@ const CustomersPage = () => {
               {isAddingCustomer ? "Add New Customer" : "Edit Customer Details"}
             </DialogTitle>
             <DialogDescription>
-              {isAddingCustomer 
-                ? "Add a new customer to the system." 
+              {isAddingCustomer
+                ? "Add a new customer to the system."
                 : `Update details for ${selectedCustomer?.full_name}`}
             </DialogDescription>
           </DialogHeader>
@@ -1104,11 +1175,11 @@ const CustomersPage = () => {
               <div className="p-3 bg-muted/50 rounded-lg">
                 <p className="text-sm font-medium text-foreground mb-1">Login Method</p>
                 <p className="text-xs text-muted-foreground">
-                  {formData.phone.length >= 10 
+                  {formData.phone.length >= 10
                     ? `✅ Phone login enabled: Customer can login with phone ${formData.phone} (password = phone number)`
                     : formData.email.includes("@")
-                    ? "📧 Email login: Enter a password below or leave empty to auto-generate"
-                    : "Enter phone (10 digits) or email to enable customer login"
+                      ? "📧 Email login: Enter a password below or leave empty to auto-generate"
+                      : "Enter phone (10 digits) or email to enable customer login"
                   }
                 </p>
               </div>
@@ -1163,8 +1234,8 @@ const CustomersPage = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setIsAddingCustomer(false);
                 setIsEditingCustomer(false);
@@ -1173,7 +1244,7 @@ const CustomersPage = () => {
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={isAddingCustomer ? handleAddCustomer : handleEditCustomer}
               disabled={isSaving}
             >
@@ -1194,7 +1265,7 @@ const CustomersPage = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Customer</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{selectedCustomer?.full_name}</strong>? 
+              Are you sure you want to delete <strong>{selectedCustomer?.full_name}</strong>?
               This action cannot be undone and will remove all associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>

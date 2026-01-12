@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,10 +61,10 @@ const RecordPaymentDialog = ({
   const [bills, setBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Payment mode: "single" or "bulk"
   const [paymentMode, setPaymentMode] = useState<"single" | "bulk">("single");
-  
+
   // Form state
   const [amount, setAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -73,13 +73,7 @@ const RecordPaymentDialog = ({
   const [notes, setNotes] = useState("");
   const [selectedBillId, setSelectedBillId] = useState<string>("");
 
-  useEffect(() => {
-    if (isOpen && customerId) {
-      fetchUnpaidBills();
-    }
-  }, [isOpen, customerId]);
-
-  const fetchUnpaidBills = async () => {
+  const fetchUnpaidBills = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -91,7 +85,7 @@ const RecordPaymentDialog = ({
 
       if (error) throw error;
       setBills(data || []);
-      
+
       // Auto-select first bill if available
       if (data && data.length > 0) {
         setSelectedBillId(data[0].id);
@@ -100,7 +94,13 @@ const RecordPaymentDialog = ({
       console.error("Error fetching bills:", error);
     }
     setIsLoading(false);
-  };
+  }, [customerId]);
+
+  useEffect(() => {
+    if (isOpen && customerId) {
+      fetchUnpaidBills();
+    }
+  }, [isOpen, customerId, fetchUnpaidBills]);
 
   const handleSubmit = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -149,7 +149,7 @@ const RecordPaymentDialog = ({
               title: "Payment Recorded",
               description: `₹${paymentAmount.toLocaleString()} received and applied.`,
             });
-          } catch (e: any) {
+          } catch (e: unknown) {
             // Fallback: record payment only; balances will update later
             const { error: paymentError } = await supabase.from("payments").insert({
               bill_id: selectedBillId,
@@ -164,7 +164,7 @@ const RecordPaymentDialog = ({
 
             toast({
               title: "Payment Received",
-              description: `₹${paymentAmount.toLocaleString()} received. Balances will update after verification.`, 
+              description: `₹${paymentAmount.toLocaleString()} received. Balances will update after verification.`,
             });
           }
         } else {
@@ -227,7 +227,7 @@ const RecordPaymentDialog = ({
               title: "Bulk Payment Recorded",
               description: `₹${paymentAmount.toLocaleString()} allocated across ${data?.allocated_count ?? 0} bill(s).`,
             });
-          } catch (e: any) {
+          } catch (e: unknown) {
             // Fallback: record a single generic payment (cannot allocate client-side without bill IDs)
             const firstBill = bills[0];
             if (firstBill) {
@@ -244,7 +244,7 @@ const RecordPaymentDialog = ({
 
               toast({
                 title: "Payment Received",
-                description: `₹${paymentAmount.toLocaleString()} received. Allocation will be applied after verification.`, 
+                description: `₹${paymentAmount.toLocaleString()} received. Allocation will be applied after verification.`,
               });
             } else {
               throw e;
@@ -319,11 +319,12 @@ const RecordPaymentDialog = ({
       resetForm();
       onPaymentRecorded();
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error recording payment:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to record payment.";
       toast({
         title: "Error",
-        description: error.message || "Failed to record payment.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -374,21 +375,19 @@ const RecordPaymentDialog = ({
             <div className="flex gap-2 bg-muted p-1 rounded-lg">
               <button
                 onClick={() => setPaymentMode("single")}
-                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  paymentMode === "single"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${paymentMode === "single"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Single Bill
               </button>
               <button
                 onClick={() => setPaymentMode("bulk")}
-                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  paymentMode === "bulk"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${paymentMode === "bulk"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Bulk Payment
               </button>
@@ -407,17 +406,17 @@ const RecordPaymentDialog = ({
               <div className="space-y-2">
                 <Label htmlFor="bill">Apply to Bill *</Label>
                 <Select value={selectedBillId} onValueChange={setSelectedBillId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a bill" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bills.map((bill) => (
-                    <SelectItem key={bill.id} value={bill.id}>
-                      {bill.bill_number} - ₹{Number(bill.balance_due).toLocaleString()} due
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a bill" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bills.map((bill) => (
+                      <SelectItem key={bill.id} value={bill.id}>
+                        {bill.bill_number} - ₹{Number(bill.balance_due).toLocaleString()} due
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 

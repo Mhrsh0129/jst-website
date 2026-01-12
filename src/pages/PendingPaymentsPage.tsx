@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -36,14 +36,13 @@ export default function PendingPaymentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [approving, setApproving] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchPayments();
-  }, []);
 
-  const fetchPayments = async () => {
+
+  const fetchPayments = useCallback(async () => {
     setIsLoading(true);
     try {
       // Fetch all payment requests - cast as any since table was just created
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase as any)
         .from("payment_requests")
         .select("*")
@@ -53,12 +52,12 @@ export default function PendingPaymentsPage() {
         console.error("Fetch error:", error);
         throw error;
       }
-      
+
       setPayments(data || []);
 
       // Fetch customer profiles for each unique customer_id
       const customerIds = [...new Set((data || []).map((p: PaymentRequest) => p.customer_id))];
-      
+
       if (customerIds.length === 0) return;
 
       const { data: profilesData, error: profileError } = await supabase
@@ -73,6 +72,7 @@ export default function PendingPaymentsPage() {
 
       if (profilesData) {
         const customerMap: Record<string, Customer> = {};
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         profilesData.forEach((profile: any) => {
           customerMap[profile.user_id] = {
             email: profile.email || "Unknown",
@@ -94,7 +94,11 @@ export default function PendingPaymentsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
 
   const handleApprove = async (paymentId: string) => {
     setApproving(paymentId);
@@ -118,11 +122,12 @@ export default function PendingPaymentsPage() {
 
       // Refresh payments list
       fetchPayments();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error approving payment:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to approve payment";
       toast({
         title: "Error",
-        description: error.message || "Failed to approve payment",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -152,11 +157,12 @@ export default function PendingPaymentsPage() {
 
       // Refresh payments list
       fetchPayments();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error rejecting payment:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to reject payment";
       toast({
         title: "Error",
-        description: error.message || "Failed to reject payment",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
