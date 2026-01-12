@@ -1,3 +1,5 @@
+// Deno Edge Function - HTTP imports and Deno global are valid in Deno runtime
+// VS Code may show errors but the code works correctly when deployed
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -9,7 +11,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -25,7 +27,7 @@ Deno.serve(async (req) => {
         JSON.stringify({
           error: "Missing: customerId, amount, or billIds",
         }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -49,7 +51,7 @@ Deno.serve(async (req) => {
       console.error("Insert error:", insertError);
       return new Response(
         JSON.stringify({ error: insertError.message }),
-        { status: 400, headers: corsHeaders }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -60,13 +62,14 @@ Deno.serve(async (req) => {
         success: true,
         paymentRequest,
       }),
-      { status: 200, headers: corsHeaders }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (error: any) {
-    console.error("Function error:", error.message);
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.error("Function error:", errorMsg);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: corsHeaders }
+      JSON.stringify({ error: errorMsg }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
