@@ -26,6 +26,9 @@ export interface ProductFormData {
   category: string;
   min_order_quantity: string;
   stock_status: string;
+  stock_quantity: string;
+  minimum_stock_level: string;
+  reorder_point: string;
   image_url: string;
 }
 
@@ -91,6 +94,35 @@ const ProductFormDialog = memo(({
               type="number"
               value={formData.min_order_quantity}
               onChange={(e) => setFormData(prev => ({ ...prev, min_order_quantity: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <Label htmlFor="prod-stock-qty">Stock Qty</Label>
+            <Input
+              id="prod-stock-qty"
+              type="number"
+              value={formData.stock_quantity}
+              onChange={(e) => setFormData(prev => ({ ...prev, stock_quantity: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="prod-min-level">Min Level</Label>
+            <Input
+              id="prod-min-level"
+              type="number"
+              value={formData.minimum_stock_level}
+              onChange={(e) => setFormData(prev => ({ ...prev, minimum_stock_level: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label htmlFor="prod-reorder">Reorder Point</Label>
+            <Input
+              id="prod-reorder"
+              type="number"
+              value={formData.reorder_point}
+              onChange={(e) => setFormData(prev => ({ ...prev, reorder_point: e.target.value }))}
             />
           </div>
         </div>

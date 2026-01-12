@@ -258,6 +258,9 @@ export type Database = {
           name: string
           price_per_meter: number
           stock_status: string | null
+          stock_quantity: number | null
+          minimum_stock_level: number | null
+          reorder_point: number | null
           updated_at: string
         }
         Insert: {
@@ -271,6 +274,9 @@ export type Database = {
           name: string
           price_per_meter: number
           stock_status?: string | null
+          stock_quantity?: number | null
+          minimum_stock_level?: number | null
+          reorder_point?: number | null
           updated_at?: string
         }
         Update: {
@@ -284,6 +290,9 @@ export type Database = {
           name?: string
           price_per_meter?: number
           stock_status?: string | null
+          stock_quantity?: number | null
+          minimum_stock_level?: number | null
+          reorder_point?: number | null
           updated_at?: string
         }
         Relationships: []

@@ -126,10 +126,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
-  // Phone login: uses phone number as both email (phone@jst.local) and password
+  // Phone login: uses phone number as both email (phone@jst.com) and password
   const signInWithPhone = async (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
-    const phoneEmail = `${cleanPhone}@jst.local`;
+    const phoneEmail = `${cleanPhone}@jst.com`;
     
     console.log("Attempting phone login with email:", phoneEmail);
     

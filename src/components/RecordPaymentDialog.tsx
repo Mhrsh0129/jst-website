@@ -38,6 +38,7 @@ interface RecordPaymentDialogProps {
   customerId: string;
   customerName: string;
   onPaymentRecorded: () => void;
+  canUpdateBills?: boolean;
 }
 
 const PAYMENT_METHODS = [
@@ -54,11 +55,15 @@ const RecordPaymentDialog = ({
   customerId,
   customerName,
   onPaymentRecorded,
+  canUpdateBills = true,
 }: RecordPaymentDialogProps) => {
   const { toast } = useToast();
   const [bills, setBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Payment mode: "single" or "bulk"
+  const [paymentMode, setPaymentMode] = useState<"single" | "bulk">("single");
   
   // Form state
   const [amount, setAmount] = useState("");
@@ -107,7 +112,7 @@ const RecordPaymentDialog = ({
       return;
     }
 
-    if (!selectedBillId) {
+    if (paymentMode === "single" && !selectedBillId) {
       toast({
         title: "Select Bill",
         description: "Please select a bill to apply this payment to.",
@@ -116,55 +121,199 @@ const RecordPaymentDialog = ({
       return;
     }
 
-    const selectedBill = bills.find(b => b.id === selectedBillId);
-    if (!selectedBill) return;
-
     const paymentAmount = parseFloat(amount);
 
     setIsSaving(true);
     try {
-      // Insert payment record
-      const { error: paymentError } = await supabase.from("payments").insert({
-        bill_id: selectedBillId,
-        customer_id: customerId,
-        amount: paymentAmount,
-        payment_method: paymentMethod,
-        transaction_id: transactionId || null,
-        notes: notes || null,
-        created_at: paymentDate.toISOString(),
-      });
+      if (paymentMode === "single") {
+        // Single bill payment
+        const selectedBill = bills.find(b => b.id === selectedBillId);
+        if (!selectedBill) return;
 
-      if (paymentError) throw paymentError;
+        if (!canUpdateBills) {
+          try {
+            const { data, error } = await supabase.functions.invoke("record-customer-payment", {
+              body: {
+                mode: "single",
+                amount: paymentAmount,
+                bill_id: selectedBillId,
+                payment_method: paymentMethod,
+                transaction_id: transactionId || null,
+                notes: notes || null,
+                payment_date: paymentDate.toISOString(),
+              },
+            });
+            if (error) throw error;
 
-      // Update bill amounts
-      const newPaidAmount = paymentAmount;
-      const newBalance = Math.max(0, Number(selectedBill.balance_due) - paymentAmount);
-      const newStatus = newBalance <= 0 ? "paid" : "partial";
+            toast({
+              title: "Payment Recorded",
+              description: `₹${paymentAmount.toLocaleString()} received and applied.`,
+            });
+          } catch (e: any) {
+            // Fallback: record payment only; balances will update later
+            const { error: paymentError } = await supabase.from("payments").insert({
+              bill_id: selectedBillId,
+              customer_id: customerId,
+              amount: paymentAmount,
+              payment_method: paymentMethod,
+              transaction_id: transactionId || null,
+              notes: notes || null,
+              created_at: paymentDate.toISOString(),
+            });
+            if (paymentError) throw paymentError;
 
-      // First get current bill data
-      const { data: currentBill, error: fetchError } = await supabase
-        .from("bills")
-        .select("paid_amount")
-        .eq("id", selectedBillId)
-        .single();
+            toast({
+              title: "Payment Received",
+              description: `₹${paymentAmount.toLocaleString()} received. Balances will update after verification.`, 
+            });
+          }
+        } else {
+          const { error: paymentError } = await supabase.from("payments").insert({
+            bill_id: selectedBillId,
+            customer_id: customerId,
+            amount: paymentAmount,
+            payment_method: paymentMethod,
+            transaction_id: transactionId || null,
+            notes: notes || null,
+            created_at: paymentDate.toISOString(),
+          });
 
-      if (fetchError) throw fetchError;
+          if (paymentError) throw paymentError;
 
-      const { error: billError } = await supabase
-        .from("bills")
-        .update({
-          paid_amount: Number(currentBill.paid_amount) + paymentAmount,
-          balance_due: newBalance,
-          status: newStatus,
-        })
-        .eq("id", selectedBillId);
+          const newBalance = Math.max(0, Number(selectedBill.balance_due) - paymentAmount);
+          const newStatus = newBalance <= 0 ? "paid" : "partial";
 
-      if (billError) throw billError;
+          const { data: currentBill, error: fetchError } = await supabase
+            .from("bills")
+            .select("paid_amount")
+            .eq("id", selectedBillId)
+            .single();
 
-      toast({
-        title: "Payment Recorded",
-        description: `₹${paymentAmount.toLocaleString()} payment recorded successfully for ${customerName}.`,
-      });
+          if (fetchError) throw fetchError;
+
+          const { error: billError } = await supabase
+            .from("bills")
+            .update({
+              paid_amount: Number(currentBill.paid_amount) + paymentAmount,
+              balance_due: newBalance,
+              status: newStatus,
+            })
+            .eq("id", selectedBillId);
+
+          if (billError) throw billError;
+
+          toast({
+            title: "Payment Recorded",
+            description: `₹${paymentAmount.toLocaleString()} payment recorded for ${customerName}.`,
+          });
+        }
+      } else {
+        // Bulk payment - allocate across multiple bills
+        if (!canUpdateBills) {
+          try {
+            const { data, error } = await supabase.functions.invoke("record-customer-payment", {
+              body: {
+                mode: "bulk",
+                amount: paymentAmount,
+                payment_method: paymentMethod,
+                transaction_id: transactionId || null,
+                notes: notes || null,
+                payment_date: paymentDate.toISOString(),
+              },
+            });
+            if (error) throw error;
+
+            toast({
+              title: "Bulk Payment Recorded",
+              description: `₹${paymentAmount.toLocaleString()} allocated across ${data?.allocated_count ?? 0} bill(s).`,
+            });
+          } catch (e: any) {
+            // Fallback: record a single generic payment (cannot allocate client-side without bill IDs)
+            const firstBill = bills[0];
+            if (firstBill) {
+              const { error: paymentError } = await supabase.from("payments").insert({
+                bill_id: firstBill.id,
+                customer_id: customerId,
+                amount: paymentAmount,
+                payment_method: paymentMethod,
+                transaction_id: transactionId || null,
+                notes: `Bulk payment: ${notes || ""}`,
+                created_at: paymentDate.toISOString(),
+              });
+              if (paymentError) throw paymentError;
+
+              toast({
+                title: "Payment Received",
+                description: `₹${paymentAmount.toLocaleString()} received. Allocation will be applied after verification.`, 
+              });
+            } else {
+              throw e;
+            }
+          }
+        } else {
+          let remainingAmount = paymentAmount;
+          let billsUpdated = 0;
+
+          // Sort bills by created_at (oldest first)
+          const sortedBills = [...bills].sort((a, b) => {
+            const billA = bills.find(b => b.id === a.id);
+            const billB = bills.find(b => b.id === b.id);
+            return 0; // Already sorted from fetch
+          });
+
+          for (const bill of sortedBills) {
+            if (remainingAmount <= 0) break;
+
+            const billBalance = Number(bill.balance_due);
+            const paymentForThisBill = Math.min(remainingAmount, billBalance);
+
+            // Insert payment record
+            const { error: paymentError } = await supabase.from("payments").insert({
+              bill_id: bill.id,
+              customer_id: customerId,
+              amount: paymentForThisBill,
+              payment_method: paymentMethod,
+              transaction_id: transactionId || null,
+              notes: `Bulk payment: ${notes || ""}`,
+              created_at: paymentDate.toISOString(),
+            });
+
+            if (paymentError) throw paymentError;
+
+            // Update bill
+            const { data: currentBill, error: fetchError } = await supabase
+              .from("bills")
+              .select("paid_amount")
+              .eq("id", bill.id)
+              .single();
+
+            if (fetchError) throw fetchError;
+
+            const newPaidAmount = Number(currentBill.paid_amount) + paymentForThisBill;
+            const newBalance = Math.max(0, billBalance - paymentForThisBill);
+            const newStatus = newBalance <= 0 ? "paid" : "partial";
+
+            const { error: billError } = await supabase
+              .from("bills")
+              .update({
+                paid_amount: newPaidAmount,
+                balance_due: newBalance,
+                status: newStatus,
+              })
+              .eq("id", bill.id);
+
+            if (billError) throw billError;
+
+            remainingAmount -= paymentForThisBill;
+            billsUpdated++;
+          }
+
+          toast({
+            title: "Bulk Payment Recorded",
+            description: `₹${paymentAmount.toLocaleString()} allocated across ${billsUpdated} bill(s) for ${customerName}.`,
+          });
+        }
+      }
 
       // Reset form and close
       resetForm();
@@ -221,6 +370,30 @@ const RecordPaymentDialog = ({
           </div>
         ) : (
           <div className="space-y-4 py-4">
+            {/* Payment Mode Tabs */}
+            <div className="flex gap-2 bg-muted p-1 rounded-lg">
+              <button
+                onClick={() => setPaymentMode("single")}
+                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  paymentMode === "single"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Single Bill
+              </button>
+              <button
+                onClick={() => setPaymentMode("bulk")}
+                className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  paymentMode === "bulk"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Bulk Payment
+              </button>
+            </div>
+
             {/* Total Outstanding */}
             <div className="bg-muted/50 rounded-lg p-4">
               <p className="text-sm text-muted-foreground">Total Outstanding</p>
@@ -229,10 +402,11 @@ const RecordPaymentDialog = ({
               </p>
             </div>
 
-            {/* Select Bill */}
-            <div className="space-y-2">
-              <Label htmlFor="bill">Apply to Bill *</Label>
-              <Select value={selectedBillId} onValueChange={setSelectedBillId}>
+            {/* Select Bill - Only for Single Mode */}
+            {paymentMode === "single" && (
+              <div className="space-y-2">
+                <Label htmlFor="bill">Apply to Bill *</Label>
+                <Select value={selectedBillId} onValueChange={setSelectedBillId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a bill" />
                 </SelectTrigger>
@@ -244,7 +418,18 @@ const RecordPaymentDialog = ({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+              </div>
+            )}
+
+            {/* Bulk Payment Info */}
+            {paymentMode === "bulk" && (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-sm text-blue-600 font-medium">Bulk Payment Mode</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Payment will be automatically allocated to unpaid bills in order, starting from the oldest bills.
+                </p>
+              </div>
+            )}
 
             {/* Payment Amount */}
             <div className="space-y-2">
@@ -262,9 +447,14 @@ const RecordPaymentDialog = ({
                   placeholder="Enter amount"
                 />
               </div>
-              {selectedBillId && (
+              {paymentMode === "single" && selectedBillId && (
                 <p className="text-xs text-muted-foreground">
                   Bill balance: ₹{Number(bills.find(b => b.id === selectedBillId)?.balance_due || 0).toLocaleString()}
+                </p>
+              )}
+              {paymentMode === "bulk" && (
+                <p className="text-xs text-muted-foreground">
+                  Total outstanding: ₹{totalOutstanding.toLocaleString()}
                 </p>
               )}
             </div>

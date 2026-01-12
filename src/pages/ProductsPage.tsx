@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
   Package,
@@ -13,11 +14,13 @@ import {
   Edit2,
   Trash2,
   ImageIcon,
+  Tag,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import AIChatWidget from "@/components/AIChatWidget";
 import OrderModal from "@/components/OrderModal";
 import ProductFormDialog, { ProductFormData } from "@/components/ProductFormDialog";
+import CouponManagementDialog from "@/components/CouponManagementDialog";
 
 interface Product {
   id: string;
@@ -27,7 +30,13 @@ interface Product {
   category: string;
   min_order_quantity: number;
   stock_status: string;
+  stock_quantity: number | null;
+  minimum_stock_level: number | null;
+  reorder_point: number | null;
   image_url: string | null;
+  created_at?: string;
+  updated_at?: string;
+  is_active?: boolean;
 }
 
 const initialFormData: ProductFormData = {
@@ -37,6 +46,9 @@ const initialFormData: ProductFormData = {
   category: "standard",
   min_order_quantity: "1",
   stock_status: "in_stock",
+  stock_quantity: "0",
+  minimum_stock_level: "0",
+  reorder_point: "0",
   image_url: "",
 };
 
@@ -108,12 +120,25 @@ const ProductCard = memo(({
     <div className="p-6">
       {/* Category Badge */}
       <span
-        className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 capitalize ${getCategoryColor(
+        className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-2 capitalize ${getCategoryColor(
           product.category
         )}`}
       >
         {product.category}
       </span>
+
+      {userRole === "admin" && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground">
+            Qty: {product.stock_quantity ?? 0}
+          </span>
+          {(product.stock_quantity ?? 0) <= (product.minimum_stock_level ?? 0) && (
+            <span className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-700">
+              Low stock
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Product Info */}
       <h3 className="font-display text-lg font-semibold text-foreground mb-2">
@@ -146,11 +171,15 @@ const ProductCard = memo(({
             className={`font-medium ${
               product.stock_status === "in_stock"
                 ? "text-green-600"
+                : product.stock_status === "out_of_stock"
+                ? "text-red-600"
                 : "text-amber-600"
             }`}
           >
             {product.stock_status === "in_stock"
               ? "In Stock"
+              : product.stock_status === "out_of_stock"
+              ? "Out of Stock"
               : "Limited"}
           </span>
         </div>
@@ -191,6 +220,7 @@ const ProductsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   
@@ -200,6 +230,7 @@ const ProductsPage = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState<ProductFormData>(initialFormData);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCouponDialogOpen, setIsCouponDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -229,7 +260,13 @@ const ProductsPage = () => {
         variant: "destructive",
       });
     } else {
-      setProducts(data || []);
+      const normalized = (data || []).map((p) => ({
+        ...p,
+        stock_quantity: p.stock_quantity ?? 0,
+        minimum_stock_level: p.minimum_stock_level ?? 0,
+        reorder_point: p.reorder_point ?? 0,
+      })) as Product[];
+      setProducts(normalized);
     }
 
     setIsLoadingProducts(false);
@@ -294,6 +331,9 @@ const ProductsPage = () => {
       category: product.category,
       min_order_quantity: product.min_order_quantity.toString(),
       stock_status: product.stock_status,
+      stock_quantity: (product.stock_quantity ?? 0).toString(),
+      minimum_stock_level: (product.minimum_stock_level ?? 0).toString(),
+      reorder_point: (product.reorder_point ?? 0).toString(),
       image_url: product.image_url || "",
     });
     setIsEditingProduct(true);
@@ -318,13 +358,22 @@ const ProductsPage = () => {
         category: formData.category,
         min_order_quantity: parseInt(formData.min_order_quantity) || 1,
         stock_status: formData.stock_status,
+        stock_quantity: parseInt(formData.stock_quantity) || 0,
+        minimum_stock_level: parseInt(formData.minimum_stock_level) || 0,
+        reorder_point: parseInt(formData.reorder_point) || 0,
         image_url: formData.image_url.trim() || null,
         is_active: true,
       }).select().single();
 
       if (error) throw error;
 
-      setProducts(prev => [...prev, data]);
+      const typed: Product = {
+        ...data,
+        stock_quantity: data.stock_quantity ?? 0,
+        minimum_stock_level: data.minimum_stock_level ?? 0,
+        reorder_point: data.reorder_point ?? 0,
+      };
+      setProducts(prev => [...prev, typed]);
       toast({ title: "Product added", description: `${formData.name} has been added.` });
       setIsAddingProduct(false);
       setFormData(initialFormData);
@@ -359,6 +408,9 @@ const ProductsPage = () => {
         category: formData.category,
         min_order_quantity: parseInt(formData.min_order_quantity) || 1,
         stock_status: formData.stock_status,
+        stock_quantity: parseInt(formData.stock_quantity) || 0,
+        minimum_stock_level: parseInt(formData.minimum_stock_level) || 0,
+        reorder_point: parseInt(formData.reorder_point) || 0,
         image_url: formData.image_url.trim() || null,
       }).eq("id", editingProduct.id);
 
@@ -375,6 +427,9 @@ const ProductsPage = () => {
                 category: formData.category,
                 min_order_quantity: parseInt(formData.min_order_quantity) || 1,
                 stock_status: formData.stock_status,
+                stock_quantity: parseInt(formData.stock_quantity) || 0,
+                minimum_stock_level: parseInt(formData.minimum_stock_level) || 0,
+                reorder_point: parseInt(formData.reorder_point) || 0,
                 image_url: formData.image_url.trim() || null,
               }
             : p
@@ -442,10 +497,17 @@ const ProductsPage = () => {
   }
 
   const categories = ["all", "economy", "standard", "premium"];
-  const filteredProducts =
-    selectedCategory === "all"
-      ? products
-      : products.filter((p) => p.category === selectedCategory);
+  const lowStockCount = products.filter(
+    (p) => (p.stock_quantity ?? 0) <= (p.minimum_stock_level ?? 0)
+  ).length;
+  const filteredProducts = products.filter((p) => {
+    const matchesCategory = selectedCategory === "all" ? true : p.category === selectedCategory;
+    const matchesSearch = searchTerm
+      ? p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.description || "").toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -471,10 +533,20 @@ const ProductsPage = () => {
                 </Button>
               </Link>
               {userRole === "admin" && (
-                <Button variant="gold" size="sm" onClick={openAddDialog}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Product
-                </Button>
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsCouponDialogOpen(true)}
+                  >
+                    <Tag className="w-4 h-4 mr-1" />
+                    Coupons
+                  </Button>
+                  <Button variant="gold" size="sm" onClick={openAddDialog}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Product
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -482,6 +554,31 @@ const ProductsPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {userRole === "admin" && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="bg-card rounded-xl p-6 shadow-soft">
+              <p className="text-sm text-muted-foreground mb-1">Total Products</p>
+              <p className="font-display text-2xl font-bold text-foreground">{products.length}</p>
+            </div>
+            <div className="bg-card rounded-xl p-6 shadow-soft">
+              <p className="text-sm text-muted-foreground mb-1">Low Stock</p>
+              <p className="font-display text-2xl font-bold text-amber-600">{lowStockCount}</p>
+            </div>
+            <div className="bg-card rounded-xl p-6 shadow-soft">
+              <p className="text-sm text-muted-foreground mb-1">Active Category</p>
+              <p className="font-display text-2xl font-bold text-primary">{selectedCategory}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+          <Input
+            placeholder="Search products"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="md:w-80"
+          />
+        </div>
         {/* Category Filter */}
         <div className="flex flex-wrap gap-2 mb-8">
           {categories.map((category) => (
@@ -562,6 +659,14 @@ const ProductsPage = () => {
         setFormData={setFormData}
         isSaving={isSaving}
       />
+
+      {/* Coupon Management Dialog */}
+      {userRole === "admin" && (
+        <CouponManagementDialog
+          isOpen={isCouponDialogOpen}
+          onClose={() => setIsCouponDialogOpen(false)}
+        />
+      )}
 
       {/* AI Product Assistant Chat */}
       <AIChatWidget type="product" title="Product Assistant" />

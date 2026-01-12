@@ -21,21 +21,16 @@ interface Payment {
   notes: string | null;
   created_at: string;
   bill_id: string;
-}
-
-interface Bill {
-  id: string;
-  bill_number: string;
-}
-
-interface PaymentWithBill extends Payment {
-  bill?: Bill;
+  customer_id?: string;
+  customer_name?: string;
+  type: "payment" | "pending_request";
+  status?: "pending" | "approved" | "rejected";
 }
 
 const PaymentHistoryPage = () => {
   const { user, userRole, loading } = useAuth();
   const navigate = useNavigate();
-  const [payments, setPayments] = useState<PaymentWithBill[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalPaid, setTotalPaid] = useState(0);
 
@@ -56,32 +51,70 @@ const PaymentHistoryPage = () => {
       setIsLoading(true);
 
       try {
-        // Fetch payments
-        const { data: paymentsData, error: paymentsError } = await supabase
+        const allItems: Payment[] = [];
+        let totalPaymentsAmount = 0;
+        let totalApprovedRequestsAmount = 0;
+
+        // Fetch actual payments
+        let query = supabase
           .from("payments")
           .select("*")
           .order("created_at", { ascending: false });
 
-        if (paymentsError) throw paymentsError;
+        if (userRole === "customer") {
+          query = query.eq("customer_id", user.id);
+        }
+
+        const { data: paymentsData } = await query;
+        let requestsData: any[] = [];
 
         if (paymentsData) {
-          // Fetch bills for each payment
-          const billIds = [...new Set(paymentsData.map(p => p.bill_id))];
-          const { data: billsData } = await supabase
-            .from("bills")
-            .select("id, bill_number")
-            .in("id", billIds);
-
-          const billsMap = new Map(billsData?.map(b => [b.id, b]) || []);
-          
-          const paymentsWithBills = paymentsData.map(p => ({
-            ...p,
-            bill: billsMap.get(p.bill_id),
-          }));
-
-          setPayments(paymentsWithBills);
-          setTotalPaid(paymentsData.reduce((sum, p) => sum + Number(p.amount), 0));
+          totalPaymentsAmount = paymentsData.reduce((sum, p) => sum + Number(p.amount), 0);
+          paymentsData.forEach(p => {
+            allItems.push({
+              ...p,
+              type: "payment",
+            } as Payment);
+          });
         }
+
+        // Fetch pending payment requests for customers
+        if (userRole === "customer") {
+          const { data: fetchedRequests } = await (supabase as any)
+            .from("payment_requests")
+            .select("*")
+            .eq("customer_id", user.id)
+            .order("created_at", { ascending: false });
+
+          requestsData = fetchedRequests || [];
+
+          if (requestsData.length > 0) {
+            totalApprovedRequestsAmount = requestsData
+              .filter((r: any) => r.status === "approved")
+              .reduce((sum: number, r: any) => sum + Number(r.amount), 0);
+
+            requestsData.forEach((r: any) => {
+              allItems.push({
+                id: r.id,
+                amount: r.amount,
+                payment_method: "pending",
+                transaction_id: null,
+                notes: r.notes,
+                created_at: r.created_at,
+                bill_id: "",
+                customer_id: r.customer_id,
+                type: "pending_request",
+                status: r.status,
+              } as Payment);
+            });
+          }
+        }
+
+        // Sort combined list by date
+        allItems.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+        setPayments(allItems);
+        setTotalPaid(totalPaymentsAmount + totalApprovedRequestsAmount);
       } catch (error) {
         console.error("Error fetching payments:", error);
       }
@@ -90,7 +123,36 @@ const PaymentHistoryPage = () => {
     };
 
     fetchPayments();
-  }, [user]);
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel("payments_changes")
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "payments",
+          filter: userRole === "customer" ? `customer_id=eq.${user.id}` : undefined
+        },
+        () => fetchPayments()
+      )
+      .on(
+        "postgres_changes",
+        { 
+          event: "*", 
+          schema: "public", 
+          table: "payment_requests",
+          filter: userRole === "customer" ? `customer_id=eq.${user.id}` : undefined
+        },
+        () => fetchPayments()
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [user, userRole]);
 
   if (loading) {
     return (
@@ -195,19 +257,52 @@ const PaymentHistoryPage = () => {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-green-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <CreditCard className="w-5 h-5 text-green-500" />
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        payment.type === "pending_request" 
+                          ? "bg-yellow-500/10" 
+                          : "bg-green-500/10"
+                      }`}>
+                        <CreditCard className={`w-5 h-5 ${
+                          payment.type === "pending_request" 
+                            ? "text-yellow-500" 
+                            : "text-green-500"
+                        }`} />
                       </div>
                       <div>
                         <p className="font-medium text-foreground">
                           ₹{Number(payment.amount).toLocaleString()}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {payment.bill?.bill_number || "Bill payment"}
+                          {payment.type === "pending_request" 
+                            ? (payment.status === "pending" 
+                              ? "Awaiting Approval" 
+                              : payment.status === "approved"
+                              ? "Payment Approved"
+                              : "Payment Rejected")
+                            : "Payment Received"}
                         </p>
+                        {userRole === "admin" && payment.customer_name && (
+                          <p className="text-sm font-medium text-foreground mt-1">
+                            {payment.customer_name}
+                          </p>
+                        )}
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs bg-accent/20 text-accent-foreground px-2 py-0.5 rounded-full">
-                            {getPaymentMethodLabel(payment.payment_method)}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            payment.type === "pending_request"
+                              ? payment.status === "pending"
+                                ? "bg-yellow-50 text-yellow-800 border border-yellow-200"
+                                : payment.status === "approved"
+                                ? "bg-green-50 text-green-800 border border-green-200"
+                                : "bg-red-50 text-red-800 border border-red-200"
+                              : "bg-accent/20 text-accent-foreground"
+                          }`}>
+                            {payment.type === "pending_request"
+                              ? payment.status === "pending" 
+                                ? "Pending"
+                                : payment.status === "approved"
+                                ? "Approved"
+                                : "Rejected"
+                              : getPaymentMethodLabel(payment.payment_method)}
                           </span>
                           {payment.transaction_id && (
                             <span className="text-xs text-muted-foreground">

@@ -11,9 +11,19 @@ import {
   QrCode,
 } from "lucide-react";
 import PaymentModal from "@/components/PaymentModal";
+import CustomerBulkPaymentModal from "@/components/CustomerBulkPaymentModal";
 import AIChatWidget from "@/components/AIChatWidget";
 import { generateInvoicePDF } from "@/utils/generateInvoicePDF";
 import { useToast } from "@/hooks/use-toast";
+import { exportToCsv, exportToExcel } from "@/utils/export";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Bill {
   id: string;
@@ -29,6 +39,7 @@ interface Bill {
   due_date: string | null;
   notes: string | null;
   created_at: string;
+  customer_name?: string;
 }
 
 const BillsPage = () => {
@@ -39,7 +50,12 @@ const BillsPage = () => {
   const [isLoadingBills, setIsLoadingBills] = useState(true);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isBulkPaymentOpen, setIsBulkPaymentOpen] = useState(false);
   const [downloadingBillId, setDownloadingBillId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
 
   const handleDownloadInvoice = async (bill: Bill) => {
     setDownloadingBillId(bill.id);
@@ -150,15 +166,39 @@ const BillsPage = () => {
 
   useEffect(() => {
     const fetchBills = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("bills")
         .select("*")
         .order("created_at", { ascending: false });
 
+      // Customers only see their own bills
+      if (userRole !== "admin" && userRole !== "ca" && user) {
+        query = query.eq("customer_id", user.id);
+      }
+
+      const { data, error } = await query;
+
       if (error) {
         console.error("Error fetching bills:", error);
       } else {
-        setBills(data || []);
+        let billsData = data || [];
+        
+        // For admins, fetch customer names
+        if (userRole === "admin" && billsData.length > 0) {
+          const customerIds = [...new Set(billsData.map(b => b.customer_id))];
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("user_id, full_name")
+            .in("user_id", customerIds);
+          
+          const profilesMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
+          billsData = billsData.map(b => ({
+            ...b,
+            customer_name: profilesMap.get(b.customer_id) || "Unknown"
+          }));
+        }
+        
+        setBills(billsData);
       }
 
       setIsLoadingBills(false);
@@ -167,7 +207,7 @@ const BillsPage = () => {
     if (user) {
       fetchBills();
     }
-  }, [user]);
+  }, [user, userRole]);
 
   if (loading) {
     return (
@@ -189,6 +229,40 @@ const BillsPage = () => {
         return "bg-amber-500/20 text-amber-600";
       default:
         return "bg-red-500/20 text-red-600";
+    }
+  };
+
+  const filteredBills = bills.filter((bill) => {
+    const matchesStatus = statusFilter === "all" ? true : bill.status === statusFilter;
+    const matchesSearch = searchTerm
+      ? bill.bill_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (bill.notes || "").toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+    const created = new Date(bill.created_at);
+    const matchesFrom = fromDate ? created >= new Date(fromDate) : true;
+    const matchesTo = toDate ? created <= new Date(toDate) : true;
+    return matchesStatus && matchesSearch && matchesFrom && matchesTo;
+  });
+
+  const canExport = userRole === "admin" || userRole === "ca";
+
+  const handleExport = (type: "csv" | "excel") => {
+    if (!canExport) return;
+    const rows = filteredBills.map((b) => ({
+      Bill: b.bill_number,
+      Status: b.status,
+      Subtotal: Number(b.subtotal),
+      Tax: Number(b.tax_amount),
+      Total: Number(b.total_amount),
+      Paid: Number(b.paid_amount),
+      Balance: Number(b.balance_due),
+      Created: new Date(b.created_at).toLocaleString(),
+    }));
+
+    if (type === "csv") {
+      exportToCsv(rows, "bills");
+    } else {
+      exportToExcel(rows, "bills.xlsx", "Bills");
     }
   };
 
@@ -219,6 +293,48 @@ const BillsPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Filters & Actions */}
+        <div className="bg-card border border-border rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Search</p>
+            <Input
+              placeholder="Bill number or notes"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Status</p>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="partial">Partial</SelectItem>
+                <SelectItem value="unpaid">Unpaid</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">From</p>
+            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">To</p>
+            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </div>
+        </div>
+
+        {userRole === "customer" && bills.some(b => Number(b.balance_due) > 0) && (
+          <div className="mb-6">
+            <Button variant="gold" size="sm" onClick={() => setIsBulkPaymentOpen(true)}>
+              Bulk Pay Outstanding Bills
+            </Button>
+          </div>
+        )}
+
         {/* Summary Cards - Hide financial totals from CA */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {userRole !== "ca" && (
@@ -246,18 +362,30 @@ const BillsPage = () => {
         </div>
 
         {/* Bills List */}
+        {/* Export */}
+        {canExport && (
+          <div className="flex gap-3 mb-4">
+            <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
+              Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleExport("excel")}>
+              Export Excel
+            </Button>
+          </div>
+        )}
+
         {isLoadingBills ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : bills.length === 0 ? (
+        ) : filteredBills.length === 0 ? (
           <div className="text-center py-16">
             <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground">No bills yet</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {bills.map((bill) => (
+            {filteredBills.map((bill) => (
               <div
                 key={bill.id}
                 className="bg-card rounded-xl p-6 shadow-soft"
@@ -276,6 +404,11 @@ const BillsPage = () => {
                         {bill.status}
                       </span>
                     </div>
+                    {userRole === "admin" && bill.customer_name && (
+                      <p className="text-sm font-medium text-foreground mb-1">
+                        Customer: {bill.customer_name}
+                      </p>
+                    )}
                     <p className="text-sm text-muted-foreground">
                       Created: {new Date(bill.created_at).toLocaleDateString()}
                       {bill.due_date && (
@@ -340,6 +473,28 @@ const BillsPage = () => {
             setSelectedBill(null);
           }}
           bill={selectedBill}
+        />
+      )}
+
+      {/* Bulk Payment Modal for Customer */}
+      {userRole === "customer" && (
+        <CustomerBulkPaymentModal
+          isOpen={isBulkPaymentOpen}
+          onClose={() => setIsBulkPaymentOpen(false)}
+          customerId={user!.id}
+          onPaymentSubmitted={() => {
+            // Refresh bills after payment
+            const reload = async () => {
+              let query = supabase
+                .from("bills")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .eq("customer_id", user!.id);
+              const { data } = await query;
+              setBills(data || []);
+            };
+            reload();
+          }}
         />
       )}
 

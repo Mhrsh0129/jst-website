@@ -33,6 +33,8 @@ interface Bill {
   balance_due: number;
   status: string;
   created_at: string;
+  customer_id: string;
+  customer_name?: string;
 }
 
 interface Order {
@@ -41,6 +43,17 @@ interface Order {
   status: string;
   total_amount: number;
   created_at: string;
+  customer_id: string;
+  customer_name?: string;
+}
+
+interface SampleRequest {
+  id: string;
+  product_name: string;
+  status: string;
+  created_at: string;
+  customer_id: string;
+  customer_name?: string;
 }
 
 const Dashboard = () => {
@@ -49,6 +62,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [bills, setBills] = useState<Bill[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [sampleRequests, setSampleRequests] = useState<SampleRequest[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
@@ -63,7 +77,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!user || !userRole) return;
 
       setIsLoadingData(true);
 
@@ -79,26 +93,105 @@ const Dashboard = () => {
           setProfile(profileData);
         }
 
-        // Fetch bills
-        const { data: billsData } = await supabase
+        // Fetch bills - customers see only their bills, admins see all
+        let billsQuery = supabase
           .from("bills")
           .select("*")
           .order("created_at", { ascending: false })
           .limit(5);
 
-        if (billsData) {
-          setBills(billsData);
+        if (userRole === "customer") {
+          billsQuery = billsQuery.eq("customer_id", user.id);
         }
 
-        // Fetch orders
-        const { data: ordersData } = await supabase
+        const { data: billsData } = await billsQuery;
+
+        if (billsData) {
+          let enrichedBills = billsData;
+          
+          // For admins, fetch customer names
+          if (userRole === "admin" && billsData.length > 0) {
+            const customerIds = [...new Set(billsData.map(b => b.customer_id))];
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("user_id, full_name")
+              .in("user_id", customerIds);
+            
+            const profilesMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
+            enrichedBills = billsData.map(b => ({
+              ...b,
+              customer_name: profilesMap.get(b.customer_id) || "Unknown"
+            }));
+          }
+          
+          setBills(enrichedBills);
+        }
+
+        // Fetch orders - customers see only their orders, admins see all
+        let ordersQuery = supabase
           .from("orders")
           .select("*")
           .order("created_at", { ascending: false })
           .limit(5);
 
+        if (userRole === "customer") {
+          ordersQuery = ordersQuery.eq("customer_id", user.id);
+        }
+
+        const { data: ordersData } = await ordersQuery;
+
         if (ordersData) {
-          setOrders(ordersData);
+          let enrichedOrders = ordersData;
+          
+          // For admins, fetch customer names
+          if (userRole === "admin" && ordersData.length > 0) {
+            const customerIds = [...new Set(ordersData.map(o => o.customer_id))];
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("user_id, full_name")
+              .in("user_id", customerIds);
+            
+            const profilesMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
+            enrichedOrders = ordersData.map(o => ({
+              ...o,
+              customer_name: profilesMap.get(o.customer_id) || "Unknown"
+            }));
+          }
+          
+          setOrders(enrichedOrders);
+        }
+
+        // Fetch sample requests - customers see their own, admins see all
+        let srQuery = supabase
+          .from("sample_requests")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (userRole === "customer") {
+          srQuery = srQuery.eq("customer_id", user.id);
+        }
+
+        const { data: srData } = await srQuery;
+
+        if (srData) {
+          let enrichedSR = srData;
+
+          if (userRole === "admin" && srData.length > 0) {
+            const customerIds = [...new Set(srData.map(s => s.customer_id))];
+            const { data: profiles } = await supabase
+              .from("profiles")
+              .select("user_id, full_name")
+              .in("user_id", customerIds);
+
+            const profilesMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
+            enrichedSR = srData.map(s => ({
+              ...s,
+              customer_name: profilesMap.get(s.customer_id) || "Unknown",
+            }));
+          }
+
+          setSampleRequests(enrichedSR);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -108,7 +201,26 @@ const Dashboard = () => {
     };
 
     fetchData();
-  }, [user]);
+
+    // Subscribe to bills changes for real-time updates
+    const billsChannel = supabase
+      .channel("bills_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "bills",
+          filter: userRole === "customer" ? `customer_id=eq.${user?.id}` : undefined,
+        },
+        () => fetchData()
+      )
+      .subscribe();
+
+    return () => {
+      billsChannel.unsubscribe();
+    };
+  }, [user, userRole]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -294,7 +406,7 @@ const Dashboard = () => {
 
         {/* Admin Quick Actions - Only for admin, not CA */}
         {userRole === "admin" && (
-          <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
             <Link
               to="/analytics"
               className="bg-gradient-hero text-primary-foreground rounded-xl p-6 shadow-soft hover:shadow-medium transition-all group"
@@ -317,6 +429,19 @@ const Dashboard = () => {
                 <div>
                   <p className="font-semibold text-lg text-foreground">Customer Management</p>
                   <p className="text-sm text-muted-foreground">Credit limits & reminders</p>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              to="/pending-payments"
+              className="bg-card border-2 border-yellow-500 rounded-xl p-6 shadow-soft hover:shadow-medium transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <CreditCard className="w-10 h-10 text-yellow-500 group-hover:scale-110 transition-transform" />
+                <div>
+                  <p className="font-semibold text-lg text-foreground">Payment Approvals</p>
+                  <p className="text-sm text-muted-foreground">Review & approve payments</p>
                 </div>
               </div>
             </Link>
@@ -355,6 +480,11 @@ const Dashboard = () => {
                       <p className="font-medium text-foreground text-sm">
                         {bill.bill_number}
                       </p>
+                      {userRole === "admin" && bill.customer_name && (
+                        <p className="text-xs font-medium text-accent">
+                          {bill.customer_name}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         {new Date(bill.created_at).toLocaleDateString()}
                       </p>
@@ -412,6 +542,11 @@ const Dashboard = () => {
                         <p className="font-medium text-foreground text-sm">
                           {order.order_number}
                         </p>
+                        {userRole === "admin" && order.customer_name && (
+                          <p className="text-xs font-medium text-accent">
+                            {order.customer_name}
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground">
                           {new Date(order.created_at).toLocaleDateString()}
                         </p>
@@ -438,6 +573,58 @@ const Dashboard = () => {
               )}
             </div>
           )}
+          {/* Sample Requests */}
+          <div className="bg-card rounded-xl p-6 shadow-soft">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-semibold text-foreground">
+                Recent Sample Requests
+              </h2>
+            </div>
+
+            {isLoadingData ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : sampleRequests.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-8">
+                No sample requests found
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {sampleRequests.map((sr) => (
+                  <div
+                    key={sr.id}
+                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-medium text-foreground text-sm">
+                        {sr.product_name}
+                      </p>
+                      {userRole === "admin" && sr.customer_name && (
+                        <p className="text-xs font-medium text-accent">
+                          {sr.customer_name}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(sr.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        sr.status === "pending"
+                          ? "bg-amber-500/20 text-amber-600"
+                          : sr.status === "approved"
+                          ? "bg-green-500/20 text-green-600"
+                          : "bg-blue-500/20 text-blue-600"
+                      }`}
+                    >
+                      {sr.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { exportToCsv, exportToExcel } from "@/utils/export";
 import {
   ArrowLeft,
   Loader2,
@@ -45,6 +46,16 @@ interface PaymentStats {
   pending: number;
 }
 
+interface CashFlowPoint {
+  month: string;
+  amount: number;
+}
+
+interface AgingBucket {
+  label: string;
+  amount: number;
+}
+
 const AnalyticsPage = () => {
   const { user, userRole, loading } = useAuth();
   const navigate = useNavigate();
@@ -52,6 +63,8 @@ const AnalyticsPage = () => {
   const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
   const [paymentStats, setPaymentStats] = useState<PaymentStats>({ collected: 0, pending: 0 });
+  const [cashFlow, setCashFlow] = useState<CashFlowPoint[]>([]);
+  const [aging, setAging] = useState<AgingBucket[]>([]);
   const [totalStats, setTotalStats] = useState({
     totalRevenue: 0,
     totalOrders: 0,
@@ -86,6 +99,12 @@ const AnalyticsPage = () => {
         const { data: billsData } = await supabase
           .from("bills")
           .select("*");
+
+        // Fetch payments for cash flow
+        const { data: paymentsData } = await supabase
+          .from("payments")
+          .select("id, amount, created_at")
+          .order("created_at", { ascending: true });
 
         // Fetch all profiles
         const { data: profilesData } = await supabase
@@ -124,6 +143,41 @@ const AnalyticsPage = () => {
           const totalCollected = billsData.reduce((sum, bill) => sum + Number(bill.paid_amount), 0);
           const totalPending = billsData.reduce((sum, bill) => sum + Number(bill.balance_due), 0);
           setPaymentStats({ collected: totalCollected, pending: totalPending });
+
+          // Cash flow (payments by month)
+          const cfMap = new Map<string, { amount: number; label: string }>();
+          (paymentsData || []).forEach((p) => {
+            const date = new Date(p.created_at);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+            const monthLabel = date.toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+            const existing = cfMap.get(monthKey) || { amount: 0, label: monthLabel };
+            cfMap.set(monthKey, { amount: existing.amount + Number(p.amount), label: monthLabel });
+          });
+          const sortedCf = Array.from(cfMap.entries())
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .slice(-6)
+            .map(([, val]) => ({ month: val.label, amount: val.amount }));
+          setCashFlow(sortedCf);
+
+          // Aging buckets
+          const today = new Date();
+          let current = 0, bucket30 = 0, bucket60 = 0, bucket90 = 0;
+          (billsData || []).forEach((bill) => {
+            if (!bill.due_date || Number(bill.balance_due) <= 0) return;
+            const due = new Date(bill.due_date);
+            const diffDays = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+            const outstanding = Number(bill.balance_due);
+            if (diffDays <= 0) current += outstanding;
+            else if (diffDays <= 30) bucket30 += outstanding;
+            else if (diffDays <= 60) bucket60 += outstanding;
+            else bucket90 += outstanding;
+          });
+          setAging([
+            { label: "Current", amount: current },
+            { label: "1-30", amount: bucket30 },
+            { label: "31-60", amount: bucket60 },
+            { label: "60+", amount: bucket90 },
+          ]);
 
           // Calculate top customers
           const customerOrderMap = new Map<string, { total: number; paid: number }>();
@@ -184,6 +238,27 @@ const AnalyticsPage = () => {
     return null;
   }
 
+  const revenue = totalStats.totalRevenue;
+  const collected = paymentStats.collected;
+  const pending = paymentStats.pending;
+  const expenses = 0;
+  const profit = revenue - expenses;
+
+  const handleReportExport = (type: "csv" | "excel") => {
+    const rows = [
+      { Metric: "Revenue", Amount: revenue },
+      { Metric: "Collected", Amount: collected },
+      { Metric: "Pending", Amount: pending },
+      { Metric: "Expenses", Amount: expenses },
+      { Metric: "Profit", Amount: profit },
+    ];
+    if (type === "csv") {
+      exportToCsv(rows, "financial-summary");
+    } else {
+      exportToExcel(rows, "financial-summary.xlsx", "Summary");
+    }
+  };
+
   const COLORS = ["#10b981", "#f59e0b"];
   const paymentPieData = [
     { name: "Collected", value: paymentStats.collected },
@@ -220,6 +295,23 @@ const AnalyticsPage = () => {
           </div>
         ) : (
           <>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-6">
+              <div>
+                <h2 className="font-display text-lg font-semibold text-foreground">Financial Overview</h2>
+                <p className="text-sm text-muted-foreground">Admin-only reports (P&L, cash flow, aging)</p>
+              </div>
+              {userRole === "admin" && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => handleReportExport("csv")}>
+                    Export CSV
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => handleReportExport("excel")}>
+                    Export Excel
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               <div className="bg-card rounded-xl p-6 shadow-soft">
@@ -277,6 +369,21 @@ const AnalyticsPage = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* P&L Snapshot */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              {[{ label: "Revenue", value: revenue, tone: "text-foreground" },
+                { label: "Collected", value: collected, tone: "text-green-600" },
+                { label: "Pending", value: pending, tone: "text-amber-600" },
+                { label: "Profit", value: profit, tone: "text-primary" }].map((item) => (
+                <div key={item.label} className="bg-card rounded-xl p-6 shadow-soft">
+                  <p className="text-sm text-muted-foreground">{item.label}</p>
+                  <p className={`font-display text-2xl font-bold ${item.tone}`}>
+                    ₹{Math.round(item.value).toLocaleString()}
+                  </p>
+                </div>
+              ))}
             </div>
 
             {/* Charts Row */}
@@ -363,6 +470,60 @@ const AnalyticsPage = () => {
                     </span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Cash Flow & Aging */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <div className="bg-card rounded-xl p-6 shadow-soft">
+                <h2 className="font-display text-lg font-semibold text-foreground mb-4">
+                  Cash Flow (Collections)
+                </h2>
+                {cashFlow.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={cashFlow}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="month" className="text-muted-foreground" />
+                      <YAxis className="text-muted-foreground" />
+                      <Tooltip
+                        formatter={(value: number) => [`₹${value.toLocaleString()}`, "Cash In"]}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Line type="monotone" dataKey="amount" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+                    No payments recorded
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-card rounded-xl p-6 shadow-soft">
+                <h2 className="font-display text-lg font-semibold text-foreground mb-4">
+                  Customer Aging (Outstanding)
+                </h2>
+                {aging.length > 0 ? (
+                  <div className="space-y-3">
+                    {aging.map((bucket) => (
+                      <div key={bucket.label} className="flex items-center justify-between bg-muted/30 rounded-lg px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-8 rounded-full bg-primary" />
+                          <p className="font-medium">{bucket.label}</p>
+                        </div>
+                        <p className="font-display text-lg font-semibold text-foreground">
+                          ₹{Math.round(bucket.amount).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">No outstanding balances</div>
+                )}
               </div>
             </div>
 

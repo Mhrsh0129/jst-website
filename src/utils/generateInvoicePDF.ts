@@ -205,7 +205,7 @@ export const generateInvoicePDF = (
   doc.text("Subtotal:", labelX, finalY + 10);
   doc.text(formatCurrency(bill.subtotal), valueX, finalY + 10, { align: "right" });
 
-  doc.text("Tax (GST 18%):", labelX, finalY + 18);
+  doc.text("Tax (GST 5%):", labelX, finalY + 18);
   doc.text(formatCurrency(bill.tax_amount), valueX, finalY + 18, { align: "right" });
 
   doc.setDrawColor(150, 150, 150);

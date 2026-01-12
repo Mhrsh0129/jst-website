@@ -3,6 +3,15 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { exportToCsv, exportToExcel } from "@/utils/export";
 import {
   ArrowLeft,
   ShoppingCart,
@@ -24,23 +33,29 @@ const OrdersPage = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [fromDate, setFromDate] = useState<string>("");
+  const [toDate, setToDate] = useState<string>("");
 
   useEffect(() => {
     if (!loading && !user) {
       navigate("/auth");
     }
-    // CA can only view bills, redirect them
-    if (!loading && user && userRole === "ca") {
-      navigate("/bills");
-    }
   }, [user, loading, navigate, userRole]);
 
   useEffect(() => {
     const fetchOrders = async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("orders")
         .select("*")
         .order("created_at", { ascending: false });
+
+      if (userRole !== "admin" && userRole !== "ca" && user) {
+        query = query.eq("customer_id", user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching orders:", error);
@@ -54,7 +69,7 @@ const OrdersPage = () => {
     if (user) {
       fetchOrders();
     }
-  }, [user]);
+  }, [user, userRole]);
 
   if (loading) {
     return (
@@ -80,6 +95,36 @@ const OrdersPage = () => {
         return "bg-red-500/20 text-red-600";
       default:
         return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const filteredOrders = orders.filter((order) => {
+    const matchesStatus = statusFilter === "all" ? true : order.status === statusFilter;
+    const matchesSearch = searchTerm
+      ? order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.notes || "").toLowerCase().includes(searchTerm.toLowerCase())
+      : true;
+    const created = new Date(order.created_at);
+    const matchesFrom = fromDate ? created >= new Date(fromDate) : true;
+    const matchesTo = toDate ? created <= new Date(toDate) : true;
+    return matchesStatus && matchesSearch && matchesFrom && matchesTo;
+  });
+
+  const canExport = userRole === "admin" || userRole === "ca";
+
+  const handleExport = (type: "csv" | "excel") => {
+    if (!canExport) return;
+    const rows = filteredOrders.map((o) => ({
+      Order: o.order_number,
+      Status: o.status,
+      Total: Number(o.total_amount),
+      Created: new Date(o.created_at).toLocaleString(),
+      Notes: o.notes || "",
+    }));
+    if (type === "csv") {
+      exportToCsv(rows, "orders");
+    } else {
+      exportToExcel(rows, "orders.xlsx", "Orders");
     }
   };
 
@@ -110,6 +155,41 @@ const OrdersPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Filters */}
+        <div className="bg-card border border-border rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Search</p>
+            <Input
+              placeholder="Order number or notes"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Status</p>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">From</p>
+            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">To</p>
+            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </div>
+        </div>
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-card rounded-xl p-6 shadow-soft">
@@ -132,12 +212,23 @@ const OrdersPage = () => {
           </div>
         </div>
 
+        {canExport && (
+          <div className="flex gap-3 mb-4">
+            <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
+              Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleExport("excel")}>
+              Export Excel
+            </Button>
+          </div>
+        )}
+
         {/* Orders List */}
         {isLoadingOrders ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : orders.length === 0 ? (
+        ) : filteredOrders.length === 0 ? (
           <div className="text-center py-16">
             <ShoppingCart className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground mb-4">No orders yet</p>
@@ -150,7 +241,7 @@ const OrdersPage = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => (
+            {filteredOrders.map((order) => (
               <div
                 key={order.id}
                 className="bg-card rounded-xl p-6 shadow-soft"

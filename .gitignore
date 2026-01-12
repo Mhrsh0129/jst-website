@@ -12,9 +12,27 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (sensitive data)
+.env
+.env.local
+.env.development
+.env.production
+
 # Supabase temporary files
 supabase/.temp/
 .temp/
+
+# Executables and binaries
+*.exe
+supabase.exe
+
+# Temporary SQL/debug files
+check_policies.sql
+*.sql.backup
+*.sql.tmp
+
+# Lock files (optional - team preference)
+package-lock.json
 
 # Editor directories and files
 .vscode/*

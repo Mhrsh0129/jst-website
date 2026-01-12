@@ -143,10 +143,10 @@ const AuthPage = () => {
       });
 
       if (error) {
-        if (error.message.includes("User already registered")) {
+        if (error.message.includes("User already registered") || error.message.includes("already")) {
           toast({
             title: "Account Exists",
-            description: "An account with this email already exists. Please login instead.",
+            description: "An account with this phone number already exists. Please login instead.",
             variant: "destructive",
           });
         } else {
@@ -162,7 +162,7 @@ const AuthPage = () => {
 
       toast({
         title: "Account Created!",
-        description: `Your login credentials - Email: ${generatedEmail}, Password: ${formData.phone}`,
+        description: `Welcome! You can login anytime with phone: ${formData.phone}`,
         duration: 8000,
       });
       navigate("/dashboard");

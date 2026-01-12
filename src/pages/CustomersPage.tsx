@@ -44,6 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import AddBillDialog from "@/components/AddBillDialog";
 import CustomerBillsDialog from "@/components/CustomerBillsDialog";
 import RecordPaymentDialog from "@/components/RecordPaymentDialog";
+import { exportToCsv, exportToExcel } from "@/utils/export";
 
 interface Profile {
   id: string;
@@ -222,7 +223,7 @@ const CustomersPage = () => {
     try {
       // Save reminder to database
       const { error } = await supabase.from("payment_reminders").insert({
-        customer_id: selectedCustomer.id,
+        customer_id: selectedCustomer.user_id,
         reminder_type: "whatsapp",
         message: reminderMessage,
         sent_by: user?.id,
@@ -624,6 +625,26 @@ const CustomersPage = () => {
       c.phone?.includes(searchQuery)
   );
 
+  const canExport = userRole === "admin";
+
+  const handleExport = (type: "csv" | "excel") => {
+    if (!canExport) return;
+    const rows = filteredCustomers.map((c) => ({
+      Name: c.full_name,
+      Business: c.business_name || "",
+      Phone: c.phone || "",
+      Email: c.email || "",
+      Outstanding: c.totalOutstanding,
+      Paid: c.totalPaid,
+      CreditLimit: c.credit_limit,
+    }));
+    if (type === "csv") {
+      exportToCsv(rows, "customers");
+    } else {
+      exportToExcel(rows, "customers.xlsx", "Customers");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -672,14 +693,26 @@ const CustomersPage = () => {
 
       <main className="container mx-auto px-4 py-8">
         {/* Search */}
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, business or phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-6">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, business or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          {canExport && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleExport("csv")}>
+                Export CSV
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => handleExport("excel")}>
+                Export Excel
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Summary Cards */}
