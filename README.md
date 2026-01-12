@@ -5,13 +5,18 @@ A comprehensive business management system for managing customers, products, bil
 ## 📋 Project Overview
 
 Jay Shree Traders Hub is a modern web application designed to streamline business operations including:
-- **Customer Management** - Create, view, edit customer profiles
-- **Product Catalog** - Manage products with pricing
-- **Order Management** - Process and track customer orders
-- **Billing System** - Generate bills and invoices
-- **Payment Processing** - Record and track payments
-- **Admin Dashboard** - Overview of business metrics
+- **Customer Management** - Create, view, edit customer profiles with outstanding balance tracking
+- **Product Catalog** - Manage products with pricing, inventory, and stock alerts
+- **Order Management** - Process and track customer orders with real-time updates
+- **Billing System** - Generate bills and downloadable PDF invoices
+- **Payment Processing** - Record payments, bulk payments, and payment approval workflow
+- **Coupon Management** - Create and manage discount coupons for products
+- **Analytics Dashboard** - Financial reports, P&L, cash flow, customer aging analysis
+- **Payment Requests** - Customer bulk payment requests with admin approval system
+- **Admin Dashboard** - Comprehensive overview of business metrics
 - **Role-Based Access** - Admin, Chartered Accountant (CA), and Customer roles
+- **Export Functionality** - Export data to CSV and Excel formats
+- **Real-time Updates** - Live data synchronization across all pages
 
 ## 🛠 Technology Stack
 
@@ -22,11 +27,16 @@ Jay Shree Traders Hub is a modern web application designed to streamline busines
 - Tailwind CSS - Utility-first CSS framework
 - shadcn/ui - High-quality React components
 - Lucide React - Beautiful icon library
+- Recharts - Data visualization and charts
+- jsPDF - PDF generation for invoices
+- XLSX - Excel export functionality
+- React Router - Client-side routing
 
 **Backend:**
 - Supabase - PostgreSQL database, authentication, real-time features
-- Edge Functions - Serverless backend functions
-- PostgreSQL - Relational database
+- Edge Functions - Serverless backend functions (Deno runtime)
+- PostgreSQL - Relational database with RLS (Row Level Security)
+- Real-time subscriptions - Live data updates
 
 **Development:**
 - Node.js 20.12.2+
@@ -86,18 +96,24 @@ npm run lint
 ### Tables
 - `profiles` - User profile information
 - `user_roles` - User role assignments
-- `products` - Product catalog
+- `products` - Product catalog with inventory tracking (stock_quantity, minimum_stock_level, reorder_point)
 - `orders` - Customer orders
-- `order_items` - Individual items in orders
+- `order_items` - Individual items in orders with coupon support
 - `bills` - Billing records
 - `payments` - Payment records
-- `payment_reminders` - Payment reminder logs
+- `payment_requests` - Customer payment requests awaiting approval
+- `payment_reminders` - Payment reminder logs (admin-only)
 - `sample_requests` - Sample request tracking
+- `coupons` - Discount coupon codes for products
+- `stock_history` - Inventory change tracking (planned)
+
+### Views
+- `low_stock_products` - Products at or below minimum stock level
 
 ### RLS Policies
-- **Admin** - Full access to all tables
-- **CA (Chartered Accountant)** - View bills only
-- **Customer** - Access to own orders and profile
+- **Admin** - Full access to all tables, can approve payment requests
+- **CA (Chartered Accountant)** - View bills, orders, payments (read-only access)
+- **Customer** - Access to own orders, bills, payments, and payment requests
 
 ## 🔐 Security
 
@@ -121,21 +137,34 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_key
 
 ### Admin
 - Create, view, edit, delete customers
-- Manage products
+- Manage products and inventory (stock levels, reorder points)
+- Create and manage discount coupons
 - Create and process orders
-- Record payments
-- View all bills and reports
+- Record payments (single and bulk)
+- Approve/reject customer payment requests
+- View all bills and download PDF invoices
+- Access analytics dashboard (P&L, cash flow, aging reports)
+- Export data to CSV/Excel
 - Manage payment reminders
+- View low stock alerts
 
 ### Chartered Accountant (CA)
-- View bills only
+- View bills and orders (read-only)
+- View payment history
+- Export bills and orders to CSV/Excel
 - Cannot modify orders or payments
 - Cannot create customers
+- No access to analytics or payment approvals
 
 ### Customer
-- View own orders
+- View own orders and order history
 - View own bills
-- Track payments
+- Download PDF invoices
+- Submit bulk payment requests
+- Track payment request status (pending/approved/rejected)
+- Track payment history
+- Request product samples
+- Place orders with coupon codes
 
 ## 🧪 Testing
 
@@ -168,6 +197,48 @@ Create a Chartered Accountant user (Admin only)
 ```bash
 POST /functions/v1/create-ca-user
 ```
+
+#### create-payment-request
+Customer creates a payment request for bulk payment
+
+```bash
+POST /functions/v1/create-payment-request
+Body: { customerId, amount, billIds[] }
+```
+
+#### approve-payment-request
+Admin approves or rejects a payment request
+
+```bash
+POST /functions/v1/approve-payment-request
+Body: { paymentRequestId, action: "approve" | "reject" }
+```
+
+#### record-customer-payment
+Records customer payment with bill allocation
+
+```bash
+POST /functions/v1/record-customer-payment
+Body: { mode: "single" | "bulk", amount, bill_id?, payment_method, transaction_id?, notes? }
+```
+
+## ✨ Key Features
+
+### For Admins
+- **Analytics Dashboard**: P&L reports, cash flow analysis, customer aging buckets
+- **Payment Approvals**: Review and approve customer payment requests
+- **Inventory Management**: Track stock levels with low-stock alerts
+- **Coupon System**: Create percentage or fixed-amount discount codes
+- **Bulk Operations**: Export data to CSV/Excel for reporting
+- **Invoice Generation**: Download professional PDF invoices
+- **Real-time Updates**: Live data synchronization
+
+### For Customers
+- **Bulk Payments**: Submit payment requests for multiple bills at once
+- **Payment Tracking**: Monitor payment request status
+- **UPI Integration**: Quick pay with UPI deep links
+- **Invoice Downloads**: Get PDF copies of bills
+- **Order Tracking**: Real-time order status updates
 
 ## 🐛 Known Issues
 
@@ -203,4 +274,16 @@ Proprietary - Jay Shree Traders
 
 ## 🔄 Version History
 
+- **v2.0.0** (Jan 12, 2026) - Major update:
+  - Payment request and approval system
+  - Bulk payment functionality for customers
+  - Coupon management system
+  - Inventory tracking with stock levels
+  - Analytics dashboard with P&L and cash flow
+  - Customer aging reports
+  - Export to CSV/Excel
+  - PDF invoice generation
+  - Real-time data updates
+  - PWA support
+  - Enhanced RLS policies
 - **v1.0.0** (Jan 2026) - Initial release with core functionality
