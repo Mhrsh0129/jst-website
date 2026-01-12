@@ -132,7 +132,8 @@ DECLARE
   bills_count INT;
   orders_count INT;
   payments_count INT;
-  stock_6: Final verification
+  stock_history_count INT;
+  coupons_count INT;
 BEGIN
   SELECT COUNT(*) INTO admin_count FROM public.user_roles WHERE role = 'admin';
   SELECT COUNT(*) INTO ca_count FROM public.user_roles WHERE role = 'ca';
@@ -143,6 +144,7 @@ BEGIN
   SELECT COUNT(*) INTO orders_count FROM public.orders;
   SELECT COUNT(*) INTO payments_count FROM public.payments;
   SELECT COUNT(*) INTO stock_history_count FROM public.stock_history;
+  SELECT COUNT(*) INTO coupons_count FROM public.coupons;
   SELECT COUNT(*) INTO coupons_count FROM public.coupons;
   
   RAISE NOTICE '=== COMPLETE CLEANUP DONE ===';
