@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
@@ -90,7 +89,7 @@ serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      bills = [bill as any];
+      bills = [bill];
     } else {
       const { data, error } = await userClient
         .from("bills")
@@ -212,7 +211,7 @@ serve(async (req: Request) => {
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("Function error:", msg);
     return new Response(JSON.stringify({ error: msg }), {

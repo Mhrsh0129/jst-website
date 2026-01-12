@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
@@ -131,7 +130,7 @@ serve(async (req: Request) => {
     }
 
     console.log("User created, updating profile...");
-    const profileUpdate: any = {
+    const profileUpdate: Record<string, string | number | null> = {
       full_name,
       business_name,
       phone,
