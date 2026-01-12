@@ -4,10 +4,11 @@
 --
 -- WHAT THIS SCRIPT DOES:
 -- ✅ Keeps: Admin and CA user accounts
--- ✅ Keeps: Product catalog (products, coupons, stock_history)
+-- ✅ Keeps: Product catalog (products and coupons only)
 -- ❌ Deletes: All customer accounts and their data
 -- ❌ Deletes: All bills, payments, orders, payment requests
 -- ❌ Deletes: All sample requests, payment reminders
+-- ❌ Deletes: Stock history (so new org can add their own stock data)
 --
 -- HOW TO USE:
 -- 1. Go to Supabase Dashboard → SQL Editor
@@ -102,6 +103,10 @@ WHERE customer_id IN (
   )
 );
 
+-- Delete stock history (if table exists)
+-- This allows the new organization to add their own stock data
+DELETE FROM public.stock_history;
+
 -- Step 2: Delete customer profiles (but keep admin and CA)
 DELETE FROM public.profiles 
 WHERE user_id IN (
@@ -133,6 +138,7 @@ DECLARE
   bills_count INT;
   orders_count INT;
   payments_count INT;
+  stock_history_count INT;
 BEGIN
   SELECT COUNT(*) INTO admin_count FROM public.user_roles WHERE role = 'admin';
   SELECT COUNT(*) INTO ca_count FROM public.user_roles WHERE role = 'ca';
@@ -141,12 +147,14 @@ BEGIN
   SELECT COUNT(*) INTO bills_count FROM public.bills;
   SELECT COUNT(*) INTO orders_count FROM public.orders;
   SELECT COUNT(*) INTO payments_count FROM public.payments;
+  SELECT COUNT(*) INTO stock_history_count FROM public.stock_history;
   
   RAISE NOTICE '=== CLEANUP COMPLETE ===';
   RAISE NOTICE 'Remaining Admin accounts: %', admin_count;
   RAISE NOTICE 'Remaining CA accounts: %', ca_count;
   RAISE NOTICE 'Remaining Customer accounts: % (should be 0)', customer_count;
   RAISE NOTICE 'Products in catalog: %', products_count;
+  RAISE NOTICE 'Stock history entries: % (should be 0)', stock_history_count;
   RAISE NOTICE 'Bills remaining: % (should be 0)', bills_count;
   RAISE NOTICE 'Orders remaining: % (should be 0)', orders_count;
   RAISE NOTICE 'Payments remaining: % (should be 0)', payments_count;

@@ -13,12 +13,13 @@ This script will **permanently delete all customer data** from your database. Th
 - All payment requests
 - All payment reminders
 - All sample requests
+- **All stock history** (so new org can track their own inventory)
 
 ## What Gets Preserved ✅
 
 - **Admin accounts** (role = 'admin')
 - **CA accounts** (role = 'ca')
-- **Product catalog** (all products, coupons, stock history)
+- **Product catalog** (products and coupons only - no stock history)
 - **Database schema** (all tables and structure)
 
 ## How to Use
