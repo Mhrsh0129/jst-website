@@ -376,6 +376,7 @@ const ProductsPage = () => {
       toast({ title: "Product added", description: `${formData.name} has been added.` });
       setIsAddingProduct(false);
       setFormData(initialFormData);
+      await fetchProducts(); // Force re-fetch for safety
 
     } catch (error: unknown) {
       console.error("Error adding product:", error);
@@ -440,6 +441,7 @@ const ProductsPage = () => {
       setIsEditingProduct(false);
       setEditingProduct(null);
       setFormData(initialFormData);
+      await fetchProducts(); // Force re-fetch for safety
 
     } catch (error: unknown) {
       console.error("Error updating product:", error);
@@ -470,8 +472,8 @@ const ProductsPage = () => {
         throw error;
       }
 
-      setProducts(prev => prev.filter(p => p.id !== product.id));
       toast({ title: "Product deleted", description: `${product.name} has been removed.` });
+      await fetchProducts(); // Force re-fetch for safety
 
     } catch (error: unknown) {
       console.error("Error deleting product:", error);

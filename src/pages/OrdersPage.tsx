@@ -22,6 +22,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import EditOrderDialog from "@/components/EditOrderDialog";
 
+interface OrderItem {
+  id: string;
+  product_name: string;
+  quantity_meters: number;
+  price_per_meter: number;
+  total_price: number;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -29,6 +37,7 @@ interface Order {
   total_amount: number;
   notes: string | null;
   created_at: string;
+  order_items: OrderItem[];
 }
 
 const OrdersPage = () => {
@@ -56,7 +65,10 @@ const OrdersPage = () => {
     const fetchOrders = async () => {
       let query = supabase
         .from("orders")
-        .select("*")
+        .select(`
+          *,
+          order_items (*)
+        `)
         .order("created_at", { ascending: false });
 
       if (userRole !== "admin" && userRole !== "ca" && user) {
@@ -350,8 +362,20 @@ const OrdersPage = () => {
                     <p className="text-sm text-muted-foreground">
                       Placed: {new Date(order.created_at).toLocaleDateString()}
                     </p>
+
+                    {/* Order Items List */}
+                    <div className="mt-3 space-y-1">
+                      {order.order_items?.map((item) => (
+                        <div key={item.id} className="text-xs flex items-center gap-2">
+                          <span className="font-semibold text-slate-700">{item.product_name}</span>
+                          <span className="text-muted-foreground">{item.quantity_meters}m</span>
+                          <span className="text-primary italic">@₹{Number(item.price_per_meter)}</span>
+                        </div>
+                      ))}
+                    </div>
+
                     {order.notes && (
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-sm text-muted-foreground mt-3 pt-2 border-t border-slate-100">
                         Notes: {order.notes}
                       </p>
                     )}
