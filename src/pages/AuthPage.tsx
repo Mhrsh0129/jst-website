@@ -284,10 +284,17 @@ const AuthPage = () => {
       const { error } = await signInWithPhone(formData.phone);
 
       if (error) {
+        console.error("Phone login error:", error);
         if (error.message.includes("Invalid login credentials")) {
           toast({
             title: "Login Failed",
             description: "Phone number not found. Only customers added by admin with phone login enabled can use this. Try email login or contact admin.",
+            variant: "destructive",
+          });
+        } else if (error.message.toLowerCase().includes("fetch") || error.message.toLowerCase().includes("network")) {
+          toast({
+            title: "Connection Error",
+            description: "Failed to connect to the server. Please check your internet connection or try a different browser.",
             variant: "destructive",
           });
         } else {
@@ -354,22 +361,20 @@ const AuthPage = () => {
               <button
                 type="button"
                 onClick={() => resetAuthMode("login")}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                  authMode === "login"
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${authMode === "login"
                     ? "bg-background shadow-sm text-foreground"
                     : "text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 Login
               </button>
               <button
                 type="button"
                 onClick={() => resetAuthMode("register")}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                  authMode === "register"
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${authMode === "register"
                     ? "bg-background shadow-sm text-foreground"
                     : "text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 Register
               </button>
@@ -413,9 +418,8 @@ const AuthPage = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, email: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.email ? "border-destructive" : "border-input"
-                  } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
+                  className={`w-full px-4 py-3 rounded-xl border ${errors.email ? "border-destructive" : "border-input"
+                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
                   placeholder="Enter your email"
                 />
                 {errors.email && (
@@ -434,9 +438,8 @@ const AuthPage = () => {
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
                     }
-                    className={`w-full px-4 py-3 rounded-xl border ${
-                      errors.password ? "border-destructive" : "border-input"
-                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all pr-12`}
+                    className={`w-full px-4 py-3 rounded-xl border ${errors.password ? "border-destructive" : "border-input"
+                      } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all pr-12`}
                     placeholder="Enter your password"
                   />
                   <button
@@ -516,9 +519,8 @@ const AuthPage = () => {
                       const value = e.target.value.replace(/\D/g, '').slice(0, 10);
                       setFormData({ ...formData, phone: value });
                     }}
-                    className={`flex-1 px-4 py-3 rounded-r-xl border ${
-                      errors.phone ? "border-destructive" : "border-input"
-                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
+                    className={`flex-1 px-4 py-3 rounded-r-xl border ${errors.phone ? "border-destructive" : "border-input"
+                      } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
                     placeholder="Enter 10-digit number"
                     maxLength={10}
                   />
@@ -586,9 +588,8 @@ const AuthPage = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.name ? "border-destructive" : "border-input"
-                  } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
+                  className={`w-full px-4 py-3 rounded-xl border ${errors.name ? "border-destructive" : "border-input"
+                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
                   placeholder="Enter your full name"
                 />
                 {errors.name && (
@@ -606,9 +607,8 @@ const AuthPage = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, businessName: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.businessName ? "border-destructive" : "border-input"
-                  } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
+                  className={`w-full px-4 py-3 rounded-xl border ${errors.businessName ? "border-destructive" : "border-input"
+                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
                   placeholder="Enter your business name"
                 />
                 {errors.businessName && (
@@ -627,9 +627,8 @@ const AuthPage = () => {
                     const value = e.target.value.replace(/\D/g, '').slice(0, 10);
                     setFormData({ ...formData, phone: value });
                   }}
-                  className={`w-full px-4 py-3 rounded-xl border ${
-                    errors.phone ? "border-destructive" : "border-input"
-                  } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
+                  className={`w-full px-4 py-3 rounded-xl border ${errors.phone ? "border-destructive" : "border-input"
+                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
                   placeholder="Enter 10-digit phone number"
                   maxLength={10}
                 />
@@ -681,9 +680,8 @@ const AuthPage = () => {
                       const value = e.target.value.replace(/\D/g, '').slice(0, 10);
                       setFormData({ ...formData, phone: value });
                     }}
-                    className={`flex-1 px-4 py-3 rounded-r-xl border ${
-                      errors.phone ? "border-destructive" : "border-input"
-                    } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
+                    className={`flex-1 px-4 py-3 rounded-r-xl border ${errors.phone ? "border-destructive" : "border-input"
+                      } bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all`}
                     placeholder="Enter 10-digit number"
                     maxLength={10}
                   />

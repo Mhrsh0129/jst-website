@@ -1,3 +1,5 @@
+// Deno Edge Function - HTTP imports and Deno global are valid in Deno runtime
+// VS Code may show errors but the code works correctly when deployed
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -9,7 +11,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, content-type, x-client-info, apikey",
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -81,13 +83,13 @@ Deno.serve(async (req) => {
 
       // Calculate allocations
       let remaining = request.amount;
-      const allocations: any[] = [];
+      const allocations: { billId: string; amount: number; bill_number: string }[] = [];
 
       for (const bill of bills) {
         if (remaining <= 0) break;
         const due = Number(bill.balance_due || 0);
         if (due <= 0) continue;
-        
+
         const apply = Math.min(remaining, due);
         allocations.push({ billId: bill.id, amount: apply, bill_number: bill.bill_number });
         remaining -= apply;
@@ -106,10 +108,10 @@ Deno.serve(async (req) => {
       for (const alloc of allocations) {
         const bill = bills.find((b: any) => b.id === alloc.billId);
         if (!bill) continue;
-        
+
         const newBalance = Math.max(0, Number(bill.balance_due) - alloc.amount);
         const newPaid = (Number(bill.paid_amount || 0) || 0) + alloc.amount;
-        
+
         console.log(`Updating bill ${alloc.billId}: balance ${bill.balance_due} - ${alloc.amount} = ${newBalance}, paid ${bill.paid_amount} + ${alloc.amount} = ${newPaid}`);
 
         const { error: updateErr } = await client
@@ -120,17 +122,17 @@ Deno.serve(async (req) => {
             status: newBalance === 0 ? "paid" : "pending",
           })
           .eq("id", alloc.billId);
-        
+
         if (updateErr) {
           console.error(`Update failed for bill ${alloc.billId}:`, updateErr);
         }
       }
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
+        JSON.stringify({
+          success: true,
           message: `Approved. ${allocations.length} bills updated.`,
-          allocations 
+          allocations
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -140,10 +142,11 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "Unknown action" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const errorBody = err instanceof Error ? err.message : "Server error";
     console.error("ERROR:", err);
     return new Response(
-      JSON.stringify({ error: err.message || "Server error" }),
+      JSON.stringify({ error: errorBody }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -22,4 +22,9 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     include: ["react", "react-dom"],
   },
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: "./src/testing-error-visibility/setupTests.ts",
+  },
 }));

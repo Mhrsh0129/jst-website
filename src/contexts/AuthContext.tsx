@@ -87,11 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         fetchUserRole(session.user.id).then(setUserRole);
       }
-      
+
       setLoading(false);
     });
 
@@ -130,42 +130,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signInWithPhone = async (phone: string) => {
     const cleanPhone = phone.replace(/\D/g, '');
     const phoneEmail = `${cleanPhone}@jst.com`;
-    
+
     console.log("Attempting phone login with email:", phoneEmail);
-    
-    const { error } = await supabase.auth.signInWithPassword({
-      email: phoneEmail,
-      password: cleanPhone,
-    });
 
-    if (error) {
-      console.error("Phone login error:", error.message);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: phoneEmail,
+        password: cleanPhone,
+      });
+
+      if (error) {
+        console.error("Phone login error response:", error);
+        return { error };
+      }
+
+      console.log("Phone login success:", data.user?.id);
+      return { error: null };
+    } catch (err) {
+      console.error("Phone login fatal error (failed to fetch?):", err);
+      return { error: err instanceof Error ? err : new Error(String(err)) };
     }
-
-    return { error };
   };
 
   const signInWithOtp = async (phone: string) => {
+    console.log("Attempting OTP login for phone:", phone);
     // Format phone number with country code if not present
     const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-    
-    const { error } = await supabase.auth.signInWithOtp({
-      phone: formattedPhone,
-    });
 
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: formattedPhone,
+      });
+
+      if (error) {
+        console.error("OTP login error response:", error);
+        return { error };
+      }
+
+      console.log("OTP sent successfully to:", formattedPhone);
+      return { error: null };
+    } catch (err) {
+      console.error("OTP login fatal error (failed to fetch?):", err);
+      return { error: err instanceof Error ? err : new Error(String(err)) };
+    }
   };
 
   const verifyOtp = async (phone: string, token: string) => {
+    console.log("Verifying OTP for phone:", phone);
     const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
-    
-    const { error } = await supabase.auth.verifyOtp({
-      phone: formattedPhone,
-      token,
-      type: 'sms',
-    });
 
-    return { error };
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token,
+        type: 'sms',
+      });
+
+      if (error) {
+        console.error("OTP verification error response:", error);
+        return { error };
+      }
+
+      console.log("OTP verified successfully");
+      return { error: null };
+    } catch (err) {
+      console.error("OTP verification fatal error:", err);
+      return { error: err instanceof Error ? err : new Error(String(err)) };
+    }
   };
 
   const signOut = async () => {

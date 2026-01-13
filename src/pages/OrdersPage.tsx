@@ -41,7 +41,7 @@ const OrdersPage = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
-  
+
   // Edit Dialog State
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -138,6 +138,15 @@ const OrdersPage = () => {
     );
   }
 
+  if (!user && !loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Redirecting to login...</p>
+      </div>
+    );
+  }
+
   if (!user) {
     return null;
   }
@@ -159,9 +168,11 @@ const OrdersPage = () => {
 
   const filteredOrders = orders.filter((order) => {
     const matchesStatus = statusFilter === "all" ? true : order.status === statusFilter;
+    const orderNumber = order?.order_number || "";
+    const notes = order?.notes || "";
     const matchesSearch = searchTerm
-      ? order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.notes || "").toLowerCase().includes(searchTerm.toLowerCase())
+      ? orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      notes.toLowerCase().includes(searchTerm.toLowerCase())
       : true;
     const created = new Date(order.created_at);
     const matchesFrom = fromDate ? created >= new Date(fromDate) : true;
@@ -351,12 +362,12 @@ const OrdersPage = () => {
                     <p className="font-display text-xl font-bold text-foreground mb-2">
                       ₹{Number(order.total_amount).toLocaleString()}
                     </p>
-                    
+
                     {/* Show Edit Button for Customers on Pending Orders */}
                     {userRole === "customer" && order.status === "pending" && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => openEditDialog(order)}
                         className="w-full sm:w-auto"
                       >
@@ -370,11 +381,11 @@ const OrdersPage = () => {
             ))}
           </div>
         )}
-        
+
         {/* Edit Dialog */}
-        <EditOrderDialog 
-          isOpen={isEditOpen} 
-          onClose={() => setIsEditOpen(false)} 
+        <EditOrderDialog
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
           order={selectedOrder}
           onOrderUpdated={() => {
             // Re-fetch logic is handled by the parent effect or Realtime, 

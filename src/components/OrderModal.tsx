@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Package, IndianRupee } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { calculateGST, calculateTotalWithGST, formatCurrency } from "@/utils/finance";
 
 interface Product {
   id: string;
@@ -122,8 +123,8 @@ const OrderModal = ({ isOpen, onClose, product, userId }: OrderModalProps) => {
 
       // Calculate amounts with GST
       const subtotal = totalAmount;
-      const taxAmount = subtotal * 0.05; // 5% GST
-      const totalWithTax = subtotal + taxAmount;
+      const taxAmount = calculateGST(subtotal);
+      const totalWithTax = calculateTotalWithGST(subtotal);
 
       // Create order with GST-inclusive total
       const { data: order, error: orderError } = await supabase
@@ -302,17 +303,17 @@ const OrderModal = ({ isOpen, onClose, product, userId }: OrderModalProps) => {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>₹{totalAmount.toLocaleString()}</span>
+              <span>₹{formatCurrency(totalAmount)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">GST (5%)</span>
-              <span>₹{(totalAmount * 0.05).toLocaleString()}</span>
+              <span>₹{formatCurrency(calculateGST(totalAmount))}</span>
             </div>
             <div className="border-t pt-2 flex justify-between font-semibold">
               <span>Total</span>
               <span className="text-primary flex items-center">
                 <IndianRupee className="w-4 h-4" />
-                {(totalAmount * 1.05).toLocaleString()}
+                {formatCurrency(calculateTotalWithGST(totalAmount))}
               </span>
             </div>
           </div>

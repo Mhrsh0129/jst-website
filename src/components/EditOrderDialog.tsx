@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Edit2, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { calculateGST, calculateTotalWithGST, GST_RATE } from "@/utils/finance";
 
 interface Order {
   id: string;
@@ -44,6 +45,7 @@ const EditOrderDialog = ({ isOpen, onClose, order, onOrderUpdated }: EditOrderDi
   const [isFetchingInfo, setIsFetchingInfo] = useState(true);
 
   const fetchOrderDetails = useCallback(async () => {
+    if (!order?.id) return;
     setIsFetchingInfo(true);
     try {
       const { data, error } = await supabase
@@ -69,7 +71,7 @@ const EditOrderDialog = ({ isOpen, onClose, order, onOrderUpdated }: EditOrderDi
     } finally {
       setIsFetchingInfo(false);
     }
-  }, [order.id, onClose, toast]);
+  }, [order?.id, onClose, toast]);
 
   useEffect(() => {
     if (isOpen && order) {
@@ -99,8 +101,8 @@ const EditOrderDialog = ({ isOpen, onClose, order, onOrderUpdated }: EditOrderDi
       const newSubtotal = newQuantity * pricePerMeter;
 
       // Calculate totals
-      const taxAmount = newSubtotal * 0.05; // 5% GST
-      const newTotalWithTax = newSubtotal + taxAmount;
+      const taxAmount = calculateGST(newSubtotal);
+      const newTotalWithTax = calculateTotalWithGST(newSubtotal);
 
       // 1. Update Order Item
       const { error: itemError } = await supabase
@@ -186,7 +188,7 @@ const EditOrderDialog = ({ isOpen, onClose, order, onOrderUpdated }: EditOrderDi
           <div className="space-y-4 py-4">
             <div className="bg-muted/50 p-4 rounded-lg">
               <p className="text-sm font-medium">{orderItem?.product_name}</p>
-              <p className="text-xs text-muted-foreground">Price: ₹{orderItem?.price_per_meter}/meter</p>
+              <p className="text-xs text-muted-foreground">Price: ₹{orderItem?.price_per_meter}/meter (Exclusive of {GST_RATE * 100}% GST)</p>
             </div>
 
             <div className="space-y-2">
