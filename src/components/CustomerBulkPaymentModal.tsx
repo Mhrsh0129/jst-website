@@ -259,13 +259,12 @@ const CustomerBulkPaymentModal = ({
             {paymentAmount > 0 && (
               <>
                 <div className="flex flex-col items-center gap-4">
-                  <div className="w-48 h-48 bg-muted rounded-xl flex items-center justify-center border-2 border-dashed border-border">
-                    <div className="text-center">
-                      <QrCode className="w-16 h-16 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-xs text-muted-foreground">
-                        Scan QR to Pay
-                      </p>
-                    </div>
+                  <div className="w-56 h-56 bg-white rounded-xl flex items-center justify-center border-2 border-slate-200 overflow-hidden shadow-sm">
+                    <img
+                      src="/payment-qr.jpg"
+                      alt="Payment QR Code"
+                      className="w-full h-full object-contain"
+                    />
                   </div>
                   <p className="text-sm text-muted-foreground text-center">
                     Scan the QR code using any UPI app (PhonePe, Google Pay,
